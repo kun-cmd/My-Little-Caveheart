@@ -54,6 +54,7 @@ namespace MyLittleCaveheart.EditorTools
             CreateInteractable(square, controller, CaveheartInteractionType.GentleTouch, "Gentle Touch", new Vector3(0.1f, 0.55f, 0f), new Vector2(2.0f, 0.75f), new Color(0.9f, 0.62f, 0.52f));
             CreateInteractable(square, controller, CaveheartInteractionType.OfferWater, "Water", new Vector3(5.55f, -1.1f, 0f), new Vector2(1.0f, 1.25f), new Color(0.34f, 0.72f, 0.9f));
             CreateInteractable(square, controller, CaveheartInteractionType.OpenCurtain, "Curtain", new Vector3(5.9f, 1.8f, 0f), new Vector2(1.4f, 3.4f), new Color(0.95f, 0.79f, 0.28f));
+            CreateInteractable(square, controller, CaveheartInteractionType.Scratch, "Scratch", new Vector3(-1.4f, 0.45f, 0f), new Vector2(1.15f, 0.75f), new Color(1f, 0.58f, 0.72f));
 
             var ui = CreateUi(camera, out var stateText, out var reactionText, out var timeText, out var endingText, out var debugText, out var whiteboxValuesText);
             var presenter = controller.gameObject.AddComponent<CaveheartWhiteboxPresenter>();
@@ -164,12 +165,12 @@ namespace MyLittleCaveheart.EditorTools
             canvasObject.AddComponent<GraphicRaycaster>();
 
             stateText = CreateUiText("State Text", canvasObject.transform, new Vector2(24f, -24f), new Vector2(360f, 48f), TextAnchor.UpperLeft, 24, "State: Sleeping");
-            reactionText = CreateUiText("Reaction Text", canvasObject.transform, new Vector2(24f, -76f), new Vector2(660f, 150f), TextAnchor.UpperLeft, 21, "Last: none\nClick an object to test an interaction.");
+            reactionText = CreateUiText("Reaction Text", canvasObject.transform, new Vector2(24f, -76f), new Vector2(660f, 150f), TextAnchor.UpperLeft, 21, "Today starts quietly.\nClick an action to test.");
             timeText = CreateUiText("Time Text", canvasObject.transform, new Vector2(-24f, -24f), new Vector2(220f, 44f), TextAnchor.UpperRight, 22, "Time 00:00");
             whiteboxValuesText = CreateUiText("Whitebox Values Text", canvasObject.transform, new Vector2(-24f, -72f), new Vector2(240f, 120f), TextAnchor.UpperRight, 20, "WHITEBOX VALUES\nAwake  0\nTrust  1\nStress 1");
             debugText = CreateUiText("Debug Text Toggle Mirror", canvasObject.transform, new Vector2(-24f, -200f), new Vector2(240f, 110f), TextAnchor.UpperRight, 16, string.Empty);
             debugText.gameObject.SetActive(true);
-            endingText = CreateUiText("Ending Text", canvasObject.transform, Vector2.zero, new Vector2(760f, 160f), TextAnchor.MiddleCenter, 26, "Thank you... this way I am less afraid.\n\nSometimes, slower is not failure.\nIt is standing with yourself again.");
+            endingText = CreateUiText("Ending Text", canvasObject.transform, Vector2.zero, new Vector2(760f, 160f), TextAnchor.MiddleCenter, 26, "A soft morning\n\nI can get up this way.");
             endingText.gameObject.SetActive(false);
             return canvasObject;
         }
