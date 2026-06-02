@@ -107,6 +107,7 @@ namespace MyLittleCaveheart
 
             if (controller != null)
             {
+                ApplyState(controller.CurrentState, controller.Stats);
                 UpdateDebug(controller.Stats);
             }
 

@@ -25,6 +25,8 @@ namespace MyLittleCaveheart
         public event Action<CaveheartState, CaveheartStats> StateChanged;
 
         private Text hudValuesText;
+        private Text hudStateText;
+        private Text legacyStateText;
         private Text hudReactionText;
         private Text hudTimeText;
         private RectTransform hudAwakeFill;
@@ -41,7 +43,7 @@ namespace MyLittleCaveheart
         private int scratchUseCount;
         private int forcefulUseCount;
         private bool hasAcceptedWater;
-        private bool hasFailed;
+        private bool hasMorningClosed;
         private CaveheartCharacterView characterView;
         private CaveheartInteractionType lastInteraction = CaveheartInteractionType.Wait;
         private int waitStreak;
@@ -55,11 +57,12 @@ namespace MyLittleCaveheart
         public int UsedMorningMinutes => usedMorningMinutes;
         public int MorningTimeLimitMinutes => morningTimeLimitMinutes;
         public int RemainingMorningMinutes => Mathf.Max(0, morningTimeLimitMinutes - usedMorningMinutes);
-        public bool HasFailed => hasFailed;
-        public bool IsEnded => currentState == CaveheartState.SittingUp || hasFailed;
+        public bool HasMorningClosed => hasMorningClosed;
+        public bool IsEnded => currentState == CaveheartState.SittingUp || hasMorningClosed;
 
         private void Start()
         {
+            BeginMorning();
             EnsureClickFeedbackObject();
             PruneRetiredInteractables();
             EnsureCharacterView();
@@ -68,6 +71,7 @@ namespace MyLittleCaveheart
             EnsureWhiteboxHud();
             PublishState();
             UpdateWhiteboxHudValues();
+            UpdateStateText();
             characterView?.ApplyState(currentState, stats);
             spriteAnimator?.Play(currentState);
             UpdateOutcomeUi();
@@ -84,16 +88,17 @@ namespace MyLittleCaveheart
             }
 
             UpdateWhiteboxHudValues();
+            UpdateStateText();
         }
 
         public CaveheartInteractionResult Interact(CaveheartInteractionType interactionType)
         {
             if (lockAfterEnding && IsEnded)
             {
-                var endedMessage = hasFailed ? "The morning window has closed." : "The morning has already become possible.";
-                var endedReaction = hasFailed
-                    ? "He stays curled up. There will need to be another gentler try."
-                    : "He stays seated, moving at his own pace.";
+                var endedMessage = hasMorningClosed ? "Today is already over." : "He is already sitting up.";
+                var endedReaction = hasMorningClosed
+                    ? "He stays curled up."
+                    : "He stays seated.";
                 var ended = new CaveheartInteractionResult(
                     interactionType,
                     stats,
@@ -110,15 +115,15 @@ namespace MyLittleCaveheart
             if (usedMorningMinutes + actionMinutes > morningTimeLimitMinutes)
             {
                 usedMorningMinutes = morningTimeLimitMinutes;
-                hasFailed = true;
+                hasMorningClosed = true;
                 var timedOut = new CaveheartInteractionResult(
                     interactionType,
                     stats,
                     stats,
                     currentState,
                     false,
-                    "There is not enough morning left for that.",
-                    "The room goes quiet. He is still curled up, and the chance for this attempt passes.");
+                    "There is not enough morning left.",
+                    "Today can stop here. He stays curled up.");
                 LogWhiteboxInteraction(timedOut, currentState);
                 UpdateWhiteboxHudReaction(timedOut);
                 UpdateOutcomeUi();
@@ -172,7 +177,7 @@ namespace MyLittleCaveheart
 
             if (currentState != CaveheartState.SittingUp && usedMorningMinutes >= morningTimeLimitMinutes)
             {
-                hasFailed = true;
+                hasMorningClosed = true;
             }
 
             lastInteractionWasForceful = interactionType == CaveheartInteractionType.Alarm || interactionType == CaveheartInteractionType.ShakeBed;
@@ -201,8 +206,19 @@ namespace MyLittleCaveheart
         [ContextMenu("Reset Morning")]
         public void ResetMorning()
         {
+            BeginMorning();
+            PublishState();
+            UpdateStateText();
+            characterView?.SetHasAcceptedWater(hasAcceptedWater);
+            characterView?.ApplyState(currentState, stats);
+            spriteAnimator?.Play(currentState);
+            UpdateOutcomeUi();
+        }
+
+        private void BeginMorning()
+        {
             stats = CaveheartStats.Starting;
-            currentState = CaveheartState.Sleeping;
+            currentState = CaveheartRules.EvaluateState(stats, CaveheartState.Sleeping);
             blanketUseCount = 0;
             gentleTouchUseCount = 0;
             waterUseCount = 0;
@@ -211,16 +227,11 @@ namespace MyLittleCaveheart
             forcefulUseCount = 0;
             usedMorningMinutes = 0;
             hasAcceptedWater = false;
-            hasFailed = false;
+            hasMorningClosed = false;
             lastInteraction = CaveheartInteractionType.Wait;
             waitStreak = 0;
             lastInteractionWasForceful = false;
             lastInteractionWasRejected = false;
-            PublishState();
-            characterView?.SetHasAcceptedWater(hasAcceptedWater);
-            characterView?.ApplyState(currentState, stats);
-            spriteAnimator?.Play(currentState);
-            UpdateOutcomeUi();
         }
 
         private void PublishState()
@@ -255,7 +266,7 @@ namespace MyLittleCaveheart
 
                 if (clickable.InteractionType == CaveheartInteractionType.Scratch)
                 {
-                    clickable.gameObject.SetActive(false);
+                    clickable.gameObject.SetActive(true);
                 }
                 else if (clickable.InteractionType == CaveheartInteractionType.ShakeBed || clickable.InteractionType == CaveheartInteractionType.TuckBlanket)
                 {
@@ -385,12 +396,15 @@ namespace MyLittleCaveheart
             EnsureEventSystem();
 
             hudValuesText = FindOrCreateHudText(uiRoot.transform, "Whitebox Values Text", new Vector2(-24f, -72f), new Vector2(260f, 128f), TextAnchor.UpperRight, 20);
+            hudStateText = FindOrCreateHudText(uiRoot.transform, "Whitebox Runtime State Text", new Vector2(24f, -24f), new Vector2(300f, 44f), TextAnchor.UpperLeft, 22);
+            legacyStateText = FindExistingText("State Text");
             FindOrCreateSignalBars(uiRoot.transform);
             hudReactionText = FindOrCreateHudText(uiRoot.transform, "Whitebox Runtime Reaction Text", new Vector2(24f, -76f), new Vector2(720f, 150f), TextAnchor.UpperLeft, 21);
             hudTimeText = FindOrCreateHudText(uiRoot.transform, "Whitebox Runtime Time Text", new Vector2(-24f, -24f), new Vector2(300f, 52f), TextAnchor.UpperRight, 22);
             FindOrCreateOutcomeUi(uiRoot.transform);
             EnsureBottomActionBar(uiRoot.transform);
-            hudReactionText.text = "Last: none\nClick an object to test an interaction.";
+            hudReactionText.text = "Today starts quietly.\nClick an action to test.";
+            UpdateStateText();
         }
 
         private void EnsureBottomActionBar(Transform parent)
@@ -399,19 +413,19 @@ namespace MyLittleCaveheart
             const float buttonWidth = 136f;
             const float step = buttonWidth + spacing;
             const float y = 24f;
-            const float startX = -2f * step;
+            const float startX = -2.5f * step;
 
             EnsureActionButton(parent, "Action Button - Alarm", "Urge", new Vector2(startX + step * 0f, y), CaveheartInteractionType.Alarm);
             EnsureActionButton(parent, "Action Button - Touch", "Touch", new Vector2(startX + step * 1f, y), CaveheartInteractionType.GentleTouch);
             EnsureActionButton(parent, "Action Button - Water", "Water", new Vector2(startX + step * 2f, y), CaveheartInteractionType.OfferWater);
             EnsureActionButton(parent, "Action Button - Curtain", "Window", new Vector2(startX + step * 3f, y), CaveheartInteractionType.OpenCurtain);
-            EnsureActionButton(parent, "Action Button - Wait", "Observe", new Vector2(startX + step * 4f, y), CaveheartInteractionType.Wait);
+            EnsureActionButton(parent, "Action Button - Scratch", "Scratch", new Vector2(startX + step * 4f, y), CaveheartInteractionType.Scratch);
+            EnsureActionButton(parent, "Action Button - Wait", "Observe", new Vector2(startX + step * 5f, y), CaveheartInteractionType.Wait);
 
             RemoveLegacyButton(parent, "Wait Observe Button");
             RemoveLegacyButton(parent, "Scratch Button");
             RemoveLegacyButton(parent, "Action Button - Shake Bed");
             RemoveLegacyButton(parent, "Action Button - Blanket");
-            RemoveLegacyButton(parent, "Action Button - Scratch");
         }
 
         private static void RemoveLegacyButton(Transform parent, string objectName)
@@ -766,11 +780,11 @@ namespace MyLittleCaveheart
                 return;
             }
 
-            var showSuccess = currentState == CaveheartState.SittingUp && !hasFailed;
-            var showFailure = hasFailed;
-            hudOutcomePanel.gameObject.SetActive(showSuccess || showFailure);
+            var showSittingUp = currentState == CaveheartState.SittingUp && !hasMorningClosed;
+            var showMorningClosed = hasMorningClosed;
+            hudOutcomePanel.gameObject.SetActive(showSittingUp || showMorningClosed);
 
-            if (showSuccess)
+            if (showSittingUp)
             {
                 var outcome = GetMorningOutcome();
                 if (outcome == MorningOutcome.VeryGood)
@@ -778,8 +792,8 @@ namespace MyLittleCaveheart
                     hudOutcomePanel.color = new Color(0.06f, 0.11f, 0.08f, 0.9f);
                     hudOutcomeText.text =
                         "A soft morning\n\n" +
-                        "\"Thank you... this way I am less afraid.\"\n\n" +
-                        "Slower was not failure.\nIt was you and your body standing together.";
+                        "\"I can get up this way.\"\n\n" +
+                        "He feels safe.";
                 }
                 else if (outcome == MorningOutcome.Good)
                 {
@@ -787,40 +801,40 @@ namespace MyLittleCaveheart
                     hudOutcomeText.text =
                         "He sits up\n\n" +
                         "\"I can start slowly.\"\n\n" +
-                        "The morning still presses, but he is willing to move with you.";
+                        "He is willing to move.";
                 }
                 else
                 {
                     hudOutcomePanel.color = new Color(0.11f, 0.09f, 0.07f, 0.9f);
                     hudOutcomeText.text =
                         "He gets up, tense\n\n" +
-                        "He is awake, but his shoulders stay high and the room feels sharp.\n\n" +
-                        "It worked. It did not feel safe.";
+                        "He is awake, but still tense.";
                 }
             }
-            else if (showFailure)
+            else if (showMorningClosed)
             {
                 hudOutcomePanel.color = new Color(0.1f, 0.08f, 0.08f, 0.9f);
                 hudOutcomeText.text =
-                    "The morning passes\n\n" +
-                    "He is more awake, maybe, but not ready to move with you.\n\n" +
-                    "Next time, notice the body before asking it for more.";
+                    "Today stops here\n\n" +
+                    "He is not ready to move yet.";
             }
         }
 
         private MorningOutcome GetMorningOutcome()
         {
-            if (hasFailed)
+            if (hasMorningClosed)
             {
                 return MorningOutcome.Bad;
             }
 
-            if (forcefulUseCount >= 3 || stats.trust <= CaveheartRules.SitUpTrust || stats.stress >= CaveheartRules.SitUpMaxStress)
+            if (forcefulUseCount >= 3 || stats.trust < CaveheartRules.SitUpTrust || stats.stress > CaveheartRules.SitUpMaxStress)
             {
                 return MorningOutcome.Bad;
             }
 
-            if (forcefulUseCount <= 1 && stats.trust >= 5 && stats.stress <= 3 && usedMorningMinutes <= 12)
+            var cleanVeryGood = forcefulUseCount == 0 && stats.trust >= 5 && stats.stress <= 3 && usedMorningMinutes <= 12;
+            var repairedVeryGood = forcefulUseCount == 1 && stats.trust >= 6 && stats.stress <= 2 && usedMorningMinutes <= 10;
+            if (cleanVeryGood || repairedVeryGood)
             {
                 return MorningOutcome.VeryGood;
             }
@@ -831,6 +845,40 @@ namespace MyLittleCaveheart
             }
 
             return MorningOutcome.Bad;
+        }
+
+        private void UpdateStateText()
+        {
+            var text = $"State: {StateName(currentState)}";
+            if (hudStateText != null)
+            {
+                hudStateText.gameObject.SetActive(showWhiteboxHud);
+                hudStateText.text = text;
+            }
+
+            if (legacyStateText != null)
+            {
+                legacyStateText.text = text;
+            }
+        }
+
+        private static Text FindExistingText(string objectName)
+        {
+            var target = GameObject.Find(objectName);
+            return target == null ? null : target.GetComponent<Text>();
+        }
+
+        private static string StateName(CaveheartState state)
+        {
+            switch (state)
+            {
+                case CaveheartState.Sleeping: return "Sleeping";
+                case CaveheartState.Startled: return "Startled";
+                case CaveheartState.Resisting: return "Resisting";
+                case CaveheartState.Settled: return "Settled";
+                case CaveheartState.SittingUp: return "Sitting Up";
+                default: return state.ToString();
+            }
         }
 
         private void LogWhiteboxInteraction(CaveheartInteractionResult result, CaveheartState previousState)
