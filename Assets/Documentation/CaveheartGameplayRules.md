@@ -171,7 +171,7 @@ If the next Water would enter the strong success branch, the rule layer prioriti
 
 When one action is clearly better, about 30% of Observe feedback can strongly imply that next action through body language, such as being ready for a small sip. When one action is clearly worse, about 70% can strongly imply what would crowd, interrupt, overstimulate, or pressure him. The wording should stay diegetic and physical, not system-like: "More light now would be too sudden" is acceptable; "Window is debuffed" or "Do not press Window" is not.
 
-If the score gap is unclear, Observe stays vague. The first Observe from a fresh morning also stays vague so the game does not immediately collapse into a single instructed route.
+For the current rule implementation, a next action counts as clearly better only when its score is at least 4 and it leads the second-best action by at least 2 points. A next action counts as clearly worse only when its score is at most -5 and it is at least 2 points worse than the second-worst action. If neither threshold is met, the score gap is treated as unclear and Observe stays vague. The first Observe from a fresh morning also stays vague so the game does not immediately collapse into a single instructed route.
 
 ## Retired / Inactive Action Rules
 

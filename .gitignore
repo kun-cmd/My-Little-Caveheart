@@ -39,5 +39,6 @@ ExportedObj/
 consulo/
 MemoryCaptures/
 Recordings/
+.history/
 
 Assets/AssetStoreTools*

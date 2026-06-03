@@ -1,5 +1,4 @@
 using UnityEngine;
-using UnityEngine.UI;
 
 namespace MyLittleCaveheart
 {
@@ -22,17 +21,7 @@ namespace MyLittleCaveheart
         [SerializeField] private SpriteRenderer stressPulse;
         [SerializeField] private Transform characterRoot;
 
-        [Header("Text")]
-        [SerializeField] private Text stateText;
-        [SerializeField] private Text reactionText;
-        [SerializeField] private Text timeText;
-        [SerializeField] private Text endingText;
-        [SerializeField] private Text debugText;
-        [SerializeField] private Text whiteboxValuesText;
-        [SerializeField] private bool showDebugValues = true;
-
         private float pulseTime;
-        private float elapsedSeconds;
 
         public void Configure(
             CaveheartGameController targetController,
@@ -45,13 +34,7 @@ namespace MyLittleCaveheart
             SpriteRenderer coldOverlayRenderer,
             SpriteRenderer warmLightRenderer,
             SpriteRenderer stressPulseRenderer,
-            Transform targetCharacterRoot,
-            Text stateLabel,
-            Text reactionLabel,
-            Text timeLabel,
-            Text endingLabel,
-            Text debugLabel,
-            Text whiteboxValuesLabel = null)
+            Transform targetCharacterRoot)
         {
             controller = targetController;
             body = bodyRenderer;
@@ -64,12 +47,6 @@ namespace MyLittleCaveheart
             warmLight = warmLightRenderer;
             stressPulse = stressPulseRenderer;
             characterRoot = targetCharacterRoot;
-            stateText = stateLabel;
-            reactionText = reactionLabel;
-            timeText = timeLabel;
-            endingText = endingLabel;
-            debugText = debugLabel;
-            whiteboxValuesText = whiteboxValuesLabel;
         }
 
         private void OnEnable()
@@ -97,21 +74,10 @@ namespace MyLittleCaveheart
 
         private void Update()
         {
-            elapsedSeconds += Time.deltaTime;
-
-            if (Input.GetKeyDown(KeyCode.D) || Input.GetKeyDown(KeyCode.F3) || Input.inputString.ToLowerInvariant().Contains("d"))
-            {
-                showDebugValues = !showDebugValues;
-                Debug.Log($"[Caveheart Whitebox] Debug values visible: {showDebugValues}", this);
-            }
-
             if (controller != null)
             {
                 ApplyState(controller.CurrentState, controller.Stats);
-                UpdateDebug(controller.Stats);
             }
-
-            UpdateTime();
 
             pulseTime += Time.deltaTime;
             if (stressPulse != null && controller != null)
@@ -125,33 +91,12 @@ namespace MyLittleCaveheart
 
         private void ApplyReaction(CaveheartInteractionResult result)
         {
-            if (reactionText != null)
-            {
-                var acceptance = result.accepted ? "Accepted" : "Rejected";
-                reactionText.text =
-                    $"Last: {ActionName(result.interactionType)} ({acceptance})  " +
-                    $"Time -{CaveheartRules.GetTimeCost(result.interactionType)}m  " +
-                    $"Left {(controller == null ? 0 : controller.RemainingMorningMinutes)}m\n" +
-                    result.observedReaction;
-            }
-
             ApplyState(result.state, result.after);
         }
 
         private void ApplyState(CaveheartState state, CaveheartStats stats)
         {
-            if (stateText != null)
-            {
-                stateText.text = $"State: {StateName(state)}";
-            }
-
-            if (endingText != null)
-            {
-                endingText.gameObject.SetActive(false);
-            }
-
             SetPose(state, stats);
-            UpdateDebug(stats);
         }
 
         private void SetPose(CaveheartState state, CaveheartStats stats)
@@ -211,79 +156,11 @@ namespace MyLittleCaveheart
             }
         }
 
-        private void UpdateDebug(CaveheartStats stats)
-        {
-            if (debugText == null)
-            {
-                UpdateWhiteboxValues(stats);
-                return;
-            }
-
-            debugText.gameObject.SetActive(showDebugValues);
-            debugText.text = $"Debug (D/F3)\nAwake {stats.awake}\nTrust {stats.trust}\nStress {stats.stress}";
-            UpdateWhiteboxValues(stats);
-        }
-
-        private void UpdateWhiteboxValues(CaveheartStats stats)
-        {
-            if (whiteboxValuesText == null)
-            {
-                return;
-            }
-
-            whiteboxValuesText.gameObject.SetActive(true);
-            whiteboxValuesText.text = "BODY SIGNALS";
-        }
-
-        private void UpdateTime()
-        {
-            if (timeText == null)
-            {
-                return;
-            }
-
-            var minutes = Mathf.FloorToInt(elapsedSeconds / 60f);
-            var seconds = Mathf.FloorToInt(elapsedSeconds % 60f);
-            timeText.text = controller == null
-                ? $"Time {minutes:00}:{seconds:00}"
-                : $"Time Left {controller.RemainingMorningMinutes:00}m\nUsed {controller.UsedMorningMinutes:00}/{controller.MorningTimeLimitMinutes:00}m";
-        }
-
         private static void SetAlpha(SpriteRenderer spriteRenderer, float alpha)
         {
             var color = spriteRenderer.color;
             color.a = alpha;
             spriteRenderer.color = color;
         }
-
-        private static string StateName(CaveheartState state)
-        {
-            switch (state)
-            {
-                case CaveheartState.Sleeping: return "Sleeping";
-                case CaveheartState.Startled: return "Startled";
-                case CaveheartState.Resisting: return "Resisting";
-                case CaveheartState.Settled: return "Settled";
-                case CaveheartState.SittingUp: return "Sitting Up";
-                default: return state.ToString();
-            }
-        }
-
-        private static string ActionName(CaveheartInteractionType interactionType)
-        {
-            switch (interactionType)
-            {
-                case CaveheartInteractionType.Alarm: return "Alarm";
-                case CaveheartInteractionType.ShakeBed: return "Shake bed";
-                case CaveheartInteractionType.GentleTouch: return "Gentle touch";
-                case CaveheartInteractionType.OfferWater: return "Offer water";
-                case CaveheartInteractionType.OpenCurtain: return "Open curtain";
-                case CaveheartInteractionType.TuckBlanket: return "Tuck blanket";
-                case CaveheartInteractionType.Scratch: return "Scratch";
-                case CaveheartInteractionType.Wait: return "Wait / observe";
-                default: return interactionType.ToString();
-            }
-        }
-
     }
 }

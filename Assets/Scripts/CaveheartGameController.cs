@@ -18,7 +18,7 @@ namespace MyLittleCaveheart
         [SerializeField] private CaveheartState currentState = CaveheartState.Sleeping;
         [SerializeField] private bool lockAfterEnding = true;
         [SerializeField] private bool logWhiteboxInteractions = true;
-        [SerializeField] private bool showWhiteboxHud = true;
+        [SerializeField] private bool showWhiteboxHud = false;
         [SerializeField] private int morningTimeLimitMinutes = 14;
 
         public event Action<CaveheartInteractionResult> InteractionResolved;
@@ -26,7 +26,6 @@ namespace MyLittleCaveheart
 
         private Text hudValuesText;
         private Text hudStateText;
-        private Text legacyStateText;
         private Text hudReactionText;
         private Text hudTimeText;
         private RectTransform hudAwakeFill;
@@ -395,16 +394,39 @@ namespace MyLittleCaveheart
 
             EnsureEventSystem();
 
+            RemoveObsoleteUiElement(uiRoot.transform, "Whitebox Runtime State Text");
+            RemoveObsoleteUiElement(uiRoot.transform, "Whitebox Runtime Reaction Text");
+            RemoveObsoleteUiElement(uiRoot.transform, "Whitebox Runtime Time Text");
+            RemoveObsoleteUiElement(uiRoot.transform, "Debug Text Toggle Mirror");
+            RemoveObsoleteUiElement(uiRoot.transform, "Ending Text");
+
             hudValuesText = FindOrCreateHudText(uiRoot.transform, "Whitebox Values Text", new Vector2(-24f, -72f), new Vector2(260f, 128f), TextAnchor.UpperRight, 20);
-            hudStateText = FindOrCreateHudText(uiRoot.transform, "Whitebox Runtime State Text", new Vector2(24f, -24f), new Vector2(300f, 44f), TextAnchor.UpperLeft, 22);
-            legacyStateText = FindExistingText("State Text");
+            hudStateText = FindOrCreateHudText(uiRoot.transform, "State Text", new Vector2(24f, -24f), new Vector2(420f, 56f), TextAnchor.UpperLeft, 24);
             FindOrCreateSignalBars(uiRoot.transform);
-            hudReactionText = FindOrCreateHudText(uiRoot.transform, "Whitebox Runtime Reaction Text", new Vector2(24f, -76f), new Vector2(720f, 150f), TextAnchor.UpperLeft, 21);
-            hudTimeText = FindOrCreateHudText(uiRoot.transform, "Whitebox Runtime Time Text", new Vector2(-24f, -24f), new Vector2(300f, 52f), TextAnchor.UpperRight, 22);
+            hudReactionText = FindOrCreateHudText(uiRoot.transform, "Reaction Text", new Vector2(24f, -76f), new Vector2(720f, 150f), TextAnchor.UpperLeft, 21);
+            hudTimeText = FindOrCreateHudText(uiRoot.transform, "Time Text", new Vector2(-24f, -24f), new Vector2(300f, 52f), TextAnchor.UpperRight, 22);
             FindOrCreateOutcomeUi(uiRoot.transform);
             EnsureBottomActionBar(uiRoot.transform);
-            hudReactionText.text = "Today starts quietly.\nClick an action to test.";
+            hudReactionText.text = "Morning is quiet.\nChoose how you approach him.";
             UpdateStateText();
+        }
+
+        private static void RemoveObsoleteUiElement(Transform parent, string objectName)
+        {
+            var obsolete = parent.Find(objectName);
+            if (obsolete == null)
+            {
+                return;
+            }
+
+            if (Application.isPlaying)
+            {
+                Destroy(obsolete.gameObject);
+            }
+            else
+            {
+                DestroyImmediate(obsolete.gameObject);
+            }
         }
 
         private void EnsureBottomActionBar(Transform parent)
@@ -738,7 +760,9 @@ namespace MyLittleCaveheart
 
             if (hudTimeText != null)
             {
-                hudTimeText.text = $"Time Left {RemainingMorningMinutes:00}m\nUsed {usedMorningMinutes:00}/{morningTimeLimitMinutes:00}m";
+                hudTimeText.text = showWhiteboxHud
+                    ? $"Morning left {RemainingMorningMinutes:00}m\nUsed {usedMorningMinutes:00}/{morningTimeLimitMinutes:00}m"
+                    : $"Morning left {RemainingMorningMinutes:00}m";
             }
         }
 
@@ -766,11 +790,9 @@ namespace MyLittleCaveheart
                 return;
             }
 
-            var acceptance = result.accepted ? "Accepted" : "Rejected";
-            var actionMinutes = CaveheartRules.GetTimeCost(result.interactionType);
-            hudReactionText.text =
-                $"Last: {result.interactionType} ({acceptance})  Time -{actionMinutes}m  Left {RemainingMorningMinutes}m\n" +
-                result.observedReaction;
+            hudReactionText.text = string.IsNullOrEmpty(result.message)
+                ? result.observedReaction
+                : $"{result.message}\n{result.observedReaction}";
         }
 
         private void UpdateOutcomeUi()
@@ -849,35 +871,23 @@ namespace MyLittleCaveheart
 
         private void UpdateStateText()
         {
-            var text = $"State: {StateName(currentState)}";
+            var text = VisibleStateText(currentState);
             if (hudStateText != null)
             {
-                hudStateText.gameObject.SetActive(showWhiteboxHud);
                 hudStateText.text = text;
             }
-
-            if (legacyStateText != null)
-            {
-                legacyStateText.text = text;
-            }
         }
 
-        private static Text FindExistingText(string objectName)
-        {
-            var target = GameObject.Find(objectName);
-            return target == null ? null : target.GetComponent<Text>();
-        }
-
-        private static string StateName(CaveheartState state)
+        private static string VisibleStateText(CaveheartState state)
         {
             switch (state)
             {
-                case CaveheartState.Sleeping: return "Sleeping";
-                case CaveheartState.Startled: return "Startled";
-                case CaveheartState.Resisting: return "Resisting";
-                case CaveheartState.Settled: return "Settled";
-                case CaveheartState.SittingUp: return "Sitting Up";
-                default: return state.ToString();
+                case CaveheartState.Sleeping: return "He is still deeply asleep.";
+                case CaveheartState.Startled: return "He is more awake, but still unsettled.";
+                case CaveheartState.Resisting: return "His body tenses against you.";
+                case CaveheartState.Settled: return "He is calmer now.";
+                case CaveheartState.SittingUp: return "He is ready to move.";
+                default: return "He is hard to read right now.";
             }
         }
 

@@ -1,138 +1,131 @@
-# Caveheart Core Loop Playtest Form
+# Caveheart Player Playtest Form
 
-Use one form per run. Ask the player to fill this in immediately after the attempt, before discussing the rules.
+每次游玩后填一份。请先让玩家独立填写，不要提前解释规则。
 
-## Run Setup
+目标不是收集所有信息，而是确认玩家是否真的测试到了核心循环：
+观察状态 -> 选择回应 -> 看见身体/房间反馈 -> 调整下一步。
 
-Player name or ID:
+## 基本记录
 
-Date:
+玩家代号：
 
-Build/version:
+日期：
 
-Run number:
+版本：
 
-Current rule mode: Neutral core loop
+这是第几次尝试？ 1 / 2 / 3 / 4 / 5+
 
-## First Impression
+本局结局：
 
-What did you think was happening to the little caveman at the start?
+- 坐起来了，感觉比较顺
+- 坐起来了，但过程紧张
+- 今天到这里结束
+- 不确定
 
-What did the first Observe make you think he needed?
+## 开局行为
 
-Which cue did you notice first?
+你开局第一件主动做的事是什么？
 
-- Still unclear
-- Body is tense
-- Body is calm
-- Light/window might help
-- Water might help
-- Touch might help
-- Play/scratch might help
-- I was not sure
-- Other:
+- Observe / 观察
+- Urge / 催促
+- Touch / 触碰
+- Water / 喂水
+- Window / 拉窗
+- Scratch / 挠/逗
+- 不记得
 
-How confident were you after the first Observe? 1 / 2 / 3 / 4 / 5
+为什么先做这个？
 
-## Player Route
+你最开始有没有想直接催他起来？ 有 / 没有 / 不确定
 
-Write the actions in order:
+如果有，是什么让你想催他？
 
-1.
-2.
-3.
-4.
-5.
-6.
-7.
-8.
-9.
-10.
+## Observe 是否重要
 
-Why did you choose your first action after Observe?
+你觉得 Observe / 观察有用吗？
 
-Did any action feel like an obvious default choice? If yes, which one?
+- 有用，我根据它改变了行动
+- 有一点用，但我还是主要靠猜
+- 像必须按一下的流程
+- 没感觉有用
 
-Did you ever feel you were just following a formula instead of reading the character? yes / no
+第一次 Observe 后，你觉得他最需要什么？
 
-If yes, what formula did you feel?
+- 空间 / 等一下
+- 轻一点的接触
+- 水
+- 光线 / 窗
+- 玩闹 / 挠
+- 被催起来
+- 我看不出来
 
-## Outcome
+哪一句、动作、画面或声音让你这样判断？
 
-Ending shown:
+有没有某次 Observe 让你明显改变了下一步？ 有 / 没有 / 不确定
 
-Final awake / trust / stress, if tester records it:
+如果有，是哪一步？
 
-Time used:
+## 核心循环
 
-Did the ending feel fair? 1 / 2 / 3 / 4 / 5
+你在游玩时有没有感觉到“先读他的状态，再决定怎么帮他”？  
 
-Did you understand why you got that ending? 1 / 2 / 3 / 4 / 5
+1 / 2 / 3 / 4 / 5
 
-What did you think you did well?
+1 = 完全没有，5 = 很明确
 
-What would you do differently next time?
+你每次行动后，能不能看出他的状态变好了还是变糟了？
 
-## Signal Understanding
+1 / 2 / 3 / 4 / 5
 
-What did you think his body needed most?
+你有没有在中途改变策略？
 
-- Space / Observe
-- Touch
-- Water
-- Window
-- Scratch
-- Urge
-- I was not sure
+- 有，因为我读到了新信号
+- 有，因为之前的动作失败了
+- 没有，我一直按同一套方法
+- 不确定
 
-What made you think that?
+如果你一直按同一套方法，那套方法是什么？
 
-Was any cue misleading?
+## 挫败与困惑
 
-Was any cue too strong or too obvious?
+本局最挫败的一刻是哪一步？
 
-Was any cue too subtle?
+为什么挫败？
 
-## Fixed Strategy Check
+- 不知道为什么错
+- 反馈太弱，看不出变化
+- 反馈太突然，像惩罚
+- 时间压力太大
+- 角色反应让我觉得不公平
+- 按钮/文字不清楚
+- 其他：
 
-Did you feel like Water was usually the best first response after Observe? yes / no / not sure
+有没有哪一个动作让你觉得“我不该再按了”？ 哪一个？为什么？
 
-Did you feel like Observe was useful, or just mandatory? useful / mandatory / unclear
+有没有哪一个动作让你觉得“这总是最好的选择”？ 哪一个？为什么？
 
-Did you repeat any action because it seemed numerically good? yes / no
+## 下一局
 
-If yes, which action?
+如果再玩一次，你第一步会做什么？
 
-Did any action feel useless?
+你会改变哪一个决定？
 
-Did any action feel too safe?
+你现在觉得这个游戏最想让你学会什么？
 
-Did any action feel too punishing?
+## 观察员记录
 
-## Confusion Notes
+玩家是否把 Observe 当成重要信息来源？ 是 / 否 / 部分
 
-Where were you confused?
+玩家第一次非 Observe 行动是否是 Urge？ 是 / 否
 
-What feedback did you wish the game gave you?
+玩家是否陷入固定开局路线？ 是 / 否 / 不确定
 
-Which moment made you understand the character better?
+如果是，路线：
 
-Which moment felt unfair or arbitrary?
+玩家一共试了几次：
 
-Any words, icons, animation, sound, or timing that should change?
+玩家是否从错误中恢复？ 是 / 否 / 没有明显错误
 
-## Tester Notes
+最强挫败点：
 
-Observed player behavior:
-
-Did the player notice the intended body signal? yes / no / partial
-
-Did the player fall into a fixed opening route? yes / no
-
-If yes, route:
-
-Did the player recover from a mistake? yes / no / no mistake
-
-Balance concern:
-
-Recommended follow-up change:
+最需要优先调整的地方：

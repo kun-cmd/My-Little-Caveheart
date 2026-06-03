@@ -56,9 +56,9 @@ namespace MyLittleCaveheart.EditorTools
             CreateInteractable(square, controller, CaveheartInteractionType.OpenCurtain, "Curtain", new Vector3(5.9f, 1.8f, 0f), new Vector2(1.4f, 3.4f), new Color(0.95f, 0.79f, 0.28f));
             CreateInteractable(square, controller, CaveheartInteractionType.Scratch, "Scratch", new Vector3(-1.4f, 0.45f, 0f), new Vector2(1.15f, 0.75f), new Color(1f, 0.58f, 0.72f));
 
-            var ui = CreateUi(camera, out var stateText, out var reactionText, out var timeText, out var endingText, out var debugText, out var whiteboxValuesText);
+            var ui = CreateUi();
             var presenter = controller.gameObject.AddComponent<CaveheartWhiteboxPresenter>();
-            presenter.Configure(controller, body, blanket, face, leftArm, rightArm, tear, coldOverlay, warmLight, stressPulse, characterRoot.transform, stateText, reactionText, timeText, endingText, debugText, whiteboxValuesText);
+            presenter.Configure(controller, body, blanket, face, leftArm, rightArm, tear, coldOverlay, warmLight, stressPulse, characterRoot.transform);
             Selection.activeObject = controller.gameObject;
 
             EditorSceneManager.MarkSceneDirty(scene);
@@ -154,7 +154,7 @@ namespace MyLittleCaveheart.EditorTools
             label.GetComponent<MeshRenderer>().sortingOrder = 30;
         }
 
-        private static GameObject CreateUi(Camera camera, out Text stateText, out Text reactionText, out Text timeText, out Text endingText, out Text debugText, out Text whiteboxValuesText)
+        private static GameObject CreateUi()
         {
             var canvasObject = new GameObject("Whitebox UI");
             var canvas = canvasObject.AddComponent<Canvas>();
@@ -164,14 +164,10 @@ namespace MyLittleCaveheart.EditorTools
             canvasObject.GetComponent<CanvasScaler>().referenceResolution = new Vector2(1280f, 720f);
             canvasObject.AddComponent<GraphicRaycaster>();
 
-            stateText = CreateUiText("State Text", canvasObject.transform, new Vector2(24f, -24f), new Vector2(360f, 48f), TextAnchor.UpperLeft, 24, "State: Sleeping");
-            reactionText = CreateUiText("Reaction Text", canvasObject.transform, new Vector2(24f, -76f), new Vector2(660f, 150f), TextAnchor.UpperLeft, 21, "Today starts quietly.\nClick an action to test.");
-            timeText = CreateUiText("Time Text", canvasObject.transform, new Vector2(-24f, -24f), new Vector2(220f, 44f), TextAnchor.UpperRight, 22, "Time 00:00");
-            whiteboxValuesText = CreateUiText("Whitebox Values Text", canvasObject.transform, new Vector2(-24f, -72f), new Vector2(240f, 120f), TextAnchor.UpperRight, 20, "WHITEBOX VALUES\nAwake  0\nTrust  1\nStress 1");
-            debugText = CreateUiText("Debug Text Toggle Mirror", canvasObject.transform, new Vector2(-24f, -200f), new Vector2(240f, 110f), TextAnchor.UpperRight, 16, string.Empty);
-            debugText.gameObject.SetActive(true);
-            endingText = CreateUiText("Ending Text", canvasObject.transform, Vector2.zero, new Vector2(760f, 160f), TextAnchor.MiddleCenter, 26, "A soft morning\n\nI can get up this way.");
-            endingText.gameObject.SetActive(false);
+            CreateUiText("State Text", canvasObject.transform, new Vector2(24f, -24f), new Vector2(420f, 56f), TextAnchor.UpperLeft, 24, "He is still deeply asleep.");
+            CreateUiText("Reaction Text", canvasObject.transform, new Vector2(24f, -76f), new Vector2(720f, 150f), TextAnchor.UpperLeft, 21, "Morning is quiet.\nChoose how you approach him.");
+            CreateUiText("Time Text", canvasObject.transform, new Vector2(-24f, -24f), new Vector2(300f, 52f), TextAnchor.UpperRight, 22, "Morning left 14m");
+            CreateUiText("Whitebox Values Text", canvasObject.transform, new Vector2(-24f, -72f), new Vector2(260f, 128f), TextAnchor.UpperRight, 20, "BODY SIGNALS");
             return canvasObject;
         }
 
