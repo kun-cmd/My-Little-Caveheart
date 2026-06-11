@@ -1,206 +1,208 @@
 # Caveheart Gameplay Rules
 
-This document is the current source of truth for gameplay values. When scripts change any value below, update this file in the same change.
+This document is the source of truth for the current neutral-morning rules. Update it with every gameplay value change.
 
-## Core Experience
+## Core Loop
 
-The demo should make the player move from controlling the little caveheart to reading why he cannot get up yet.
+The player is not solving hidden arithmetic. The loop is:
 
-The game should explain less through text and more through consequences:
+1. Observe evidence in his body and relationship.
+2. Form a hypothesis about what he needs.
+3. Act and read the immediate response.
+4. Correct the hypothesis or repair the relationship.
 
-- Urging wakes him quickly, but makes the room colder and his body more defensive.
-- Observing costs a little morning time, but lets the player notice signals before acting.
-- Gentle help works only when his body is ready for it.
-- Window mainly wakes the body; it should not be a reliable trust-builder that automatically unlocks water.
-- Water responds to bodily cues and stress, not only to a trust threshold.
-- Scratch is a middle-awake playful push, not an early soothing tool.
-- Current testing uses one stable neutral morning. Random morning variants are removed from the active loop.
-- Observe should describe the body state, not mark a next action as buffed, debuffed, or forbidden.
-- The room mirrors his body: pressure makes it colder and shakier; trust makes it warmer and steadier.
+The goal shown at the start of every morning is:
+
+> Help him sit up gently. Watch if he is awake, safe, and calm.
+
+Random morning profiles and random Observe hints are disabled. The current build first establishes one readable neutral morning.
 
 ## Hidden Values
 
-All three values are hidden from the player as numbers. The HUD may show bars in whitebox builds.
+The player reads these through animation, environment, sound, action feedback, and Observe text. Whitebox bars may expose them for testing.
 
 | Value | Range | Start | Meaning |
 |---|---:|---:|---|
-| awake | 0-8 | 0 | How physically awake he is |
-| trust | 0-8 | 1 | Whether he is willing to cooperate |
-| stress | 0-8 | 1 | How much his body is bracing |
+| awake | 0-8 | 0 | Physical wakefulness |
+| trust | 0-8 | 1 | Willingness to receive help |
+| stress | 0-8 | 1 | How strongly the body is bracing |
+
+He sits up when:
+
+- `awake >= 6`
+- `trust >= 4`
+- `stress <= 4`
 
 ## Time
 
-Morning time limit: 14 minutes.
+The morning window is 14 game minutes. Real seconds do not consume it.
 
-Actions consume game minutes only when the player uses a bottom action button. Real seconds do not directly consume morning time.
-
-When time runs out, the morning closes as "today stops here." This is not presented as a fail state or punishment; it is feedback for the next attempt.
-
-| Action | Time Cost |
+| Action | Time |
 |---|---:|
-| Urge / Alarm | 1m |
+| Urge | 1m |
 | Touch | 2m |
-| Water | 2m |
 | Window | 1m |
+| Water | 2m |
 | Scratch | 1m |
 | Observe | 1m |
 
-Retired or inactive actions still have code values:
+When the window closes, the result is "Today stops here", not a failure or game-over state.
 
-| Retired Action | Time Cost | Current Status |
-|---|---:|---|
-| Shake Bed | 1m | Removed from foreground UI and runtime scene props |
-| Blanket | 2m | Removed from foreground UI and runtime scene props |
+## Action Roles
+
+Each foreground action has one primary role.
+
+| Action | Primary role | What it should not replace |
+|---|---|---|
+| Urge | Ignore readiness and wake him immediately | Safety or trust |
+| Touch | Build safety and relationship | Physical waking |
+| Window | One-time environmental waking | Trust building |
+| Water | Answer a visible body need | Opening strategy |
+| Scratch | Playful waking with stimulation risk | General trust farming |
+| Observe | Read body stage and relationship state | Free progress or a random answer generator |
+
+Rejected Touch, Water, and Scratch attempts do not consume their accepted-use limits. A wrong hypothesis still costs time, stress when specified, and eligibility for Very Good, but it does not permanently remove the player's ability to repair the morning.
 
 ## Foreground Actions
-
-Only these actions should be shown on the bottom action bar.
 
 ### Urge
 
 Code interaction: `Alarm`
 
-| Change | Value |
-|---|---:|
-| awake | +2 |
-| stress | +3 |
-| trust | -1 |
-| time | 1m |
-| forcefulUseCount | +1 |
+| awake | trust | stress | accepted | time |
+|---:|---:|---:|---|---:|
+| +2 | -1 | +3 | yes | 1m |
 
-Design note: short-term progress, long-term relationship damage. Three or more forceful uses force the tense/bad outcome.
+Urge is the direct-control route: fast physical progress with clear relationship damage. It increments `forcefulUseCount`.
 
 ### Touch
 
 Code interaction: `GentleTouch`
 
-If `stress >= 6`:
+Normal result:
+
+| awake | trust | stress | accepted | time |
+|---:|---:|---:|---|---:|
+| 0 | +1 | -1 | yes | 2m |
+
+Exceptions:
 
 | Condition | Result |
 |---|---|
-| Previous action was Observe and `waitStreak > 0` | accepted, stress -2, trust +1 |
-| Otherwise | rejected, stress +1, trust -1 |
+| Previous action was Touch | rejected, stress +1 |
+| Two accepted Touch uses already occurred | rejected, stress +1 |
+| `stress >= 6` | rejected, trust -1, stress +1 |
 
-If `stress < 6`:
-
-| Condition | Result |
-|---|---|
-| `gentleTouchUses >= 2`, previous action was Observe, `waitStreak > 0`, and `trust < 4` | accepted, trust +1, stress -1 |
-| `gentleTouchUses >= 2` | rejected, stress +1, trust -1 |
-| previous action was Touch | rejected softly, stress +1 |
-| Otherwise | accepted, trust +1, stress -1 |
-
-Time cost: 2m.
-
-Design note: Touch should not be the best move twice in a row. The first Touch can create safety, and an Observe-separated Touch can repair trust up to the sit-up threshold. Repeating Touch without reading him still ignores his boundary.
-
-### Water
-
-Code interaction: `OfferWater`
-
-| Condition | Result |
-|---|---|
-| `waterUses >= 3` | rejected, stress +1 |
-| previous action was Water | rejected, stress +1 |
-| `stress > 4` | rejected, stress +1 |
-| `trust >= 3` and body is ready to drink | accepted, awake +2, trust +1, stress -1 |
-| Settled, `trust >= 3`, `stress <= 1`, previous action was not Window | accepted weakly, awake +1, stress -1 |
-| `trust >= 4`, `stress <= 3`, but no clear body cue | accepted weakly, awake +1, stress -1 |
-| `stress <= 3`, and previous action was Observe | rejected gently, no stat change |
-| `stress <= 3` without an observed cue | rejected gently, no stat change |
-| Otherwise | rejected, stress +1 |
-
-Time cost: 2m.
-
-Body ready to drink currently means `awake >= 4` from something other than the immediately previous Window. Generic opening Observe does not make Water strong; this prevents first Observe from implying Water. When the next Water would enter the strong success branch, the feedback should say it directly after any action: "He looks toward the cup." A refused Water offer should not become a default trust-building move. Consecutive Water never adds trust; repeating a refused offer turns care into pressure.
+Touch is the safest relationship action, but it is slow, never wakes him, cannot be repeated immediately, and has only two accepted uses. Limiting it to two prevents Touch from becoming the default opening in nearly every Very Good route.
 
 ### Window
 
 Code interaction: `OpenCurtain`
 
+| Condition | awake | trust | stress | accepted |
+|---|---:|---:|---:|---|
+| Previous action was Observe and `stress <= 3` | +3 | 0 | 0 | yes |
+| Opening while `awake == 0` | +2 | 0 | +1 | yes |
+| Other first use | +2 | 0 | +1 | yes |
+| Already used | 0 | 0 | +1 | no |
+
+Time: 1m.
+
+Window is the strongest non-forceful pure wake-up action because it is irreversible and available only once. Observe gives clearer timing and avoids the stress cost. Window never creates trust and does not immediately create a Water cue.
+
+### Water
+
+Code interaction: `OfferWater`
+
+Water is ready when all are true:
+
+- `awake >= 3`
+- `stress <= 3`
+- the immediately previous action was not Window
+- `trust >= 2` to accept the cup from the player
+
+Strong result:
+
+| awake | trust | stress | accepted | time |
+|---:|---:|---:|---|---:|
+| +2 | +1 | -1 | yes | 2m |
+
+Exceptions:
+
 | Condition | Result |
 |---|---|
-| `curtainUses >= 1` | rejected, stress +1 |
-| opening / `awake == 0` | accepted, awake +1, stress +1, no trust change |
-| `trust >= 3`, `stress <= 4`, and state is Settled or previous action was Observe | accepted, awake +2, stress -1 |
-| Otherwise | too bright, awake +1 net, stress +2, trust -1 |
+| Two accepted Water uses already occurred | rejected, stress +1 |
+| Previous action was Water | rejected, stress +1 |
+| `stress > 4` | rejected, stress +1 |
+| Body cue exists but `trust < 2` | rejected, no stat change |
+| No body cue | rejected, no stat change |
 
-Time cost: 1m.
-
-Design note: Window is primarily an awake/environment action. As an opener, it gives a faster but slightly tense start without damaging trust. It should not reliably increase trust, because that creates a fixed "Window -> Water" combo.
+Whenever the next Water can enter its strong branch, feedback states: "He looks toward the cup." This cue can appear after any action. If Scratch is also strongly available, feedback shows both the cup and exposed foot instead of presenting Water as the single answer. Water is a response to visible thirst, not a generic care button or opening move.
 
 ### Scratch
 
 Code interaction: `Scratch`
 
-| Condition | Result |
-|---|---|
-| `stress >= 6` | rejected, awake +1, stress +1, trust -1 |
-| previous action was Scratch | rejected, awake +1, stress +2, trust -1 |
-| `scratchUses >= 2` | rejected, awake +1, stress +1, trust -1 |
-| opening / `awake == 0` | rejected, awake +2, stress +1, trust -1 |
-| `trust < 3`, `awake >= 1`, `stress <= 2`, previous action was Observe | accepted, awake +1, trust +2, stress +2 |
-| `awake >= 3` and `trust >= 2` | accepted, awake +2, stress +1; trust +1 only if `trust >= 3` and previous action was Observe |
-| Settled, `trust >= 3`, `stress <= 1` | accepted lightly, awake +1, stress +1, no trust change |
-| Otherwise | rejected, awake +1, stress +1, trust -1 |
+| Condition | awake | trust | stress | accepted |
+|---|---:|---:|---:|---|
+| Play signal: `awake 2-5` and `stress <= 1` | +2 | +1 | +1 | yes |
+| Half-awake without play signal | +1 | 0 | +1 | yes |
+| Deep sleep: `awake == 0` | 0 | 0 | +1 | no |
+| Tense: `stress >= 4` | 0 | 0 | +1 | no |
+| One accepted Scratch already occurred, or immediate repeat | 0 | 0 | +1 | no |
 
-Time cost: 1m.
+Time: 1m.
 
-Design note: Scratch is a timing tool. As an opener, it creates a faster but rougher route: more awake than Window, less damaging than Urge, but it still costs trust. After Observe, early Scratch can become the risky trust route: more trust than Touch, but it raises stress instead of lowering it. Once he is half-awake, it can replace some need for Urge, but the strong awake gain always stimulates him. At high trust it is still risky because it raises stress, and using it twice in a row clearly backfires.
+Scratch is playful waking. It is faster and more relational than Window when the play signal exists, but it always adds stimulation. It no longer grants an exceptional `trust +2`; one accepted use is the limit.
 
 ### Observe
 
 Code interaction: `Wait`
 
-| Condition | Result |
+| Condition | trust | stress | time |
+|---|---:|---:|---:|
+| `stress >= 4` | +1 only on the first Observe immediately after a forceful action | -2 | 1m |
+| Immediately after a rejected action | 0 | -1 | 1m |
+| Otherwise | 0 | -1 | 1m |
+
+Observe always reports two stable dimensions after its calming effect:
+
+Body stage:
+
+| awake | Report |
+|---:|---|
+| 0 | Deep sleep |
+| 1-2 | Starting to wake; eyes still heavy |
+| 3-5 | Half-awake |
+| 6-8 | Awake enough to sit up |
+
+Relationship state:
+
+| Condition | Report |
 |---|---|
-| `stress >= 7` | stress -2; if previous action was forceful/rejected and this is first Observe streak, trust +1 |
-| `stress >= 4` | stress -2; if first Observe streak, trust +1 |
-| Previous action was rejected and this is first Observe streak | stress -1, trust +1 |
-| Otherwise | stress -1 |
+| `stress >= 6` | Defensive |
+| `stress >= 4` | Guarded |
+| `trust >= 5` | Actively expressing needs |
+| `trust >= 3` | Accepting help |
+| Otherwise | Hesitant |
 
-Time cost: 1m.
+Observe then adds a physical cue only when the state supports one:
 
-Design note: Observe is not a free infinite repair. It consumes time and repeated Observe does not keep adding trust.
+| Priority | Condition | Cue meaning |
+|---:|---|---|
+| 1 | Water and Scratch are both strongly available | Eyes move between cup and hand; one foot remains exposed |
+| 2 | Only Water is strongly available | His gaze returns to the cup |
+| 3 | Previous action was forceful | Feet remain protected; head permits slow Touch |
+| 4 | `stress >= 4` | More stimulation would crowd him |
+| 5 | Only Scratch is strongly available | Feet shift toward the player's hand |
+| 6 | Window unused, `awake < 3`, `stress <= 3` | Calm body, heavy eyes, no cup gaze |
+| 7 | `trust < 3`, `stress <= 3` | Head remains within reach; he waits |
 
-Observe feedback should not say "do not use X next" or imply a temporary debuff. If an action was rejected, Observe can show that giving space helped his body settle, but it should not become a rule hint that a specific button is forbidden. The player should infer broad state: tense, calmer, still unclear, more awake, or ready for gentle help.
+The first Observe of a fresh morning reports the baseline body and relationship only. It never says "no clear signal".
 
-After the opening Observe, the rule layer evaluates the next non-Urge foreground actions: Touch, Water, Window, and Scratch. It scores each action by awake gain, trust gain/loss, stress gain/loss, rejection, resistance risk, and sit-up progress.
+There is no generic candidate scoring, 30/70 split, state hash, temporary action buff, or random best/worst-action hint. When several actions are reasonable, Observe describes the state and lets the player choose a style.
 
-If the next Water would enter the strong success branch, the rule layer prioritizes the direct Water cue after any action: "He looks toward the cup." This is not a random need or temporary buff; it is the visible expression of the same body-ready condition used by the Water rule.
-
-When one action is clearly better, about 30% of Observe feedback can strongly imply that next action through body language, such as being ready for a small sip. When one action is clearly worse, about 70% can strongly imply what would crowd, interrupt, overstimulate, or pressure him. The wording should stay diegetic and physical, not system-like: "More light now would be too sudden" is acceptable; "Window is debuffed" or "Do not press Window" is not.
-
-For the current rule implementation, a next action counts as clearly better only when its score is at least 4 and it leads the second-best action by at least 2 points. A next action counts as clearly worse only when its score is at most -5 and it is at least 2 points worse than the second-worst action. If neither threshold is met, the score gap is treated as unclear and Observe stays vague. The first Observe from a fresh morning also stays vague so the game does not immediately collapse into a single instructed route.
-
-## Retired / Inactive Action Rules
-
-These remain documented because the code still contains them for testing or future experiments.
-
-### Shake Bed
-
-Current status: removed from foreground UI and runtime scene props.
-
-| Change | Value |
-|---|---:|
-| awake | +3 |
-| stress | +4 |
-| trust | -2 |
-| time | 1m |
-| forcefulUseCount | +1 |
-
-### Blanket
-
-Current status: removed from foreground UI and runtime scene props.
-
-| Condition | Result |
-|---|---|
-| `blanketUses >= 2`, `stress >= 7`, previous action was Observe | rejected but calming, stress -1 |
-| `blanketUses >= 2`, otherwise | rejected, stress +1, trust -1 |
-| `blanketUses == 0` | accepted, stress -2, trust +1 |
-| `blanketUses == 1` | accepted, stress -1 |
-
-Time cost: 2m.
+The same physical cue appears immediately when a non-Observe action creates it. The player never needs to know that a hidden threshold was crossed in order to understand that Water or playful Scratch has become reasonable.
 
 ## State Rules
 
@@ -212,69 +214,83 @@ State is evaluated after each action.
 | Resisting | `stress >= 7` |
 | Settled | `trust >= 3`, `stress <= 3` |
 | Startled | `stress >= 4` or `awake > 0` |
-| Sleeping | fallback state |
+| Sleeping | fallback |
 
 ## Outcome Rules
 
-Current implementation shows a morning reflection as soon as he reaches `SittingUp`, or when the time window closes.
-
-### Bad / Tense Outcome
-
-This is a tense version of getting up, not a failure label. Any of these:
-
-- `forcefulUseCount >= 3`.
-- `trust < 4` at sit-up.
-- `stress > 4` at sit-up.
-
 ### Today Stops Here
 
-If time runs out before he sits up, the attempt ends with "Today stops here." The game should avoid language like failure, lose, or game over. The state is still useful feedback about what his body could not receive today.
+The 14-minute window closes before SittingUp. The text describes which need was still unmet without calling the attempt a failure.
 
-### Good Outcome
+### Tense Morning
 
-All of these:
+Any of these:
 
-- He reaches `SittingUp`.
-- Time has not run out.
-- `trust >= 4`.
-- `stress <= 4`.
-- Does not qualify for Very Good.
+- `forcefulUseCount >= 3`
+- `trust < 4` at sit-up
+- `stress > 4` at sit-up
 
-### Very Good Outcome
+### Good
+
+He reaches SittingUp within 14 minutes with `trust >= 4` and `stress <= 4`, but does not meet Very Good.
+
+### Very Good
 
 No-force version:
 
-- He reaches `SittingUp`.
-- Time has not run out.
-- `forcefulUseCount == 0`.
-- `trust >= 5`.
-- `stress <= 3`.
-- `usedMorningMinutes <= 12`.
+- `forcefulUseCount == 0`
+- `rejectedActionCount == 0`
+- `trust >= 5`
+- `stress <= 3`
+- `usedMorningMinutes <= 12`
 
 Repaired-after-one-Urge version:
 
-- He reaches `SittingUp`.
-- Time has not run out.
-- `forcefulUseCount == 1`.
-- `trust >= 6`.
-- `stress <= 2`.
-- `usedMorningMinutes <= 10`.
+- `forcefulUseCount == 1`
+- `rejectedActionCount == 0`
+- `trust >= 5`
+- `stress <= 2`
+- `usedMorningMinutes <= 12`
 
-## Environment Feedback
+Any rejected action disqualifies Very Good. This prevents a route from mistreating him early and erasing the mistake through later arithmetic, while still allowing a Good recovery.
 
-Environment should show consequences rather than explain them.
+## Required Route Coverage
 
-| Signal | Rule |
+The rule tests must keep all three styles viable:
+
+| Style | Example |
 |---|---|
-| Cold overlay | Increases with stress and time pressure |
-| Camera shake | Increases when stress is above low/mid range; stops after SittingUp |
-| Door shadow | Increases with time pressure and stress |
-| Warm light | Increases with trust and Settled/SittingUp states |
-| Red pulse | Only appears at extreme pressure: `stress >= 7` |
+| Safe | Touch -> Observe -> Window -> Touch -> Observe -> Water -> Observe -> Water |
+| Play | Window -> Observe -> Scratch -> Touch -> Observe -> Touch -> Water |
+| Repair | Urge -> Observe -> Touch -> Window -> Observe -> Touch -> Water |
 
-## Current UI Rules
+At least one Very Good route must use no Scratch. Scratch is an optional style, not a hidden required answer.
 
-- Bottom action bar is the only input source for gameplay actions.
-- Scene props are visual signals only and must not respond to direct mouse clicks.
-- Hovering a bottom action button may flash the matching scene prop.
-- HUD should show bars, not numeric stat values. Numeric values may stay available in the Inspector and Console for whitebox debugging.
+## Feedback Rules
+
+Every interaction presents:
+
+1. What the player did.
+2. How he reacted.
+3. Plain-language impact on waking, safety, or tension.
+
+The scene, animation, and sound reinforce this feedback but never carry the entire explanation alone. A rejection should reveal why the hypothesis failed whenever the body language can support that conclusion.
+
+## Current UI
+
+- Actions are spatial `Collider2D` zones in the scene, not bottom buttons.
+- Touch is on the head; Scratch is on the feet.
+- Window and Water use their matching scene props.
+- Observe is the lowest-priority scene `BoxCollider2D`. Empty scene space uses the Observe eye cursor, while specific action zones take priority over it.
+- Hovering an available interaction replaces the mouse with its 64 px action icon.
+- After 0.35 seconds, the hover label shows the action name and time cost.
+- Observe shows `Observe 1m` through the same scene hover label as other actions.
+- Used-up actions return to the normal cursor and show a physical state sentence instead of a numeric charge counter.
+- Touch stops after two accepted uses, Water after two, Scratch after one, and Window after opening.
+- Clicking an unavailable action never consumes morning time.
+- Zone bounds and curtain sprites are exposed in the Inspector.
+- Hidden values remain available through whitebox bars and logs.
+
+## Retired Actions
+
+`ShakeBed` and `TuckBlanket` remain in code for compatibility but are not foreground actions or active scene props.

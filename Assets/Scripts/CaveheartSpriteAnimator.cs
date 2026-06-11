@@ -6,45 +6,58 @@ namespace MyLittleCaveheart
     public sealed class CaveheartSpriteAnimator : MonoBehaviour
     {
         [SerializeField] private SpriteRenderer targetRenderer;
+        [SerializeField] private int sortingOrder = 80;
+        [SerializeField] private bool applySortingOrder = true;
+        [SerializeField] private bool animateFrames;
         [SerializeField] private float framesPerSecond = 6f;
         [SerializeField] private string resourceRoot = "Sprites/Caveheart";
+        [SerializeField] private int frameCount = 4;
+        [SerializeField] private string sleepingClipName = "sleeping";
+        [SerializeField] private string startledClipName = "startled";
+        [SerializeField] private string resistingClipName = "resisting";
+        [SerializeField] private string settledClipName = "settled";
+        [SerializeField] private string sittingUpClipName = "sitting";
 
         private readonly Dictionary<CaveheartState, Sprite[]> clips = new Dictionary<CaveheartState, Sprite[]>();
         private CaveheartState currentState = CaveheartState.Sleeping;
         private float frameTimer;
         private int frameIndex;
 
-        public void BindOrCreateRenderer()
+        public bool BindConfiguredRenderer()
         {
-            if (targetRenderer != null)
-            {
-                return;
-            }
-
-            var existing = GameObject.Find("Little Caveheart Animated Sprite");
-            if (existing == null)
-            {
-                existing = new GameObject("Little Caveheart Animated Sprite");
-                existing.transform.position = new Vector3(0f, -0.35f, -0.55f);
-                existing.transform.localScale = new Vector3(2.2f, 2.2f, 1f);
-            }
-
-            targetRenderer = existing.GetComponent<SpriteRenderer>();
             if (targetRenderer == null)
             {
-                targetRenderer = existing.AddComponent<SpriteRenderer>();
+                Debug.LogWarning("CaveheartSpriteAnimator needs a scene SpriteRenderer assigned before play mode.", this);
+                return false;
             }
 
-            targetRenderer.sortingOrder = 80;
+            ApplyRendererSettings();
+            return true;
+        }
+
+        public void Configure(SpriteRenderer renderer, string root = null, int? order = null)
+        {
+            targetRenderer = renderer;
+            if (!string.IsNullOrEmpty(root))
+            {
+                resourceRoot = root;
+            }
+
+            if (order.HasValue)
+            {
+                sortingOrder = order.Value;
+            }
+
+            ApplyRendererSettings();
         }
 
         public void LoadClips()
         {
-            clips[CaveheartState.Sleeping] = LoadClip("sleeping");
-            clips[CaveheartState.Startled] = LoadClip("startled");
-            clips[CaveheartState.Resisting] = LoadClip("resisting");
-            clips[CaveheartState.Settled] = LoadClip("settled");
-            clips[CaveheartState.SittingUp] = LoadClip("sitting");
+            clips[CaveheartState.Sleeping] = LoadClip(sleepingClipName);
+            clips[CaveheartState.Startled] = LoadClip(startledClipName);
+            clips[CaveheartState.Resisting] = LoadClip(resistingClipName);
+            clips[CaveheartState.Settled] = LoadClip(settledClipName);
+            clips[CaveheartState.SittingUp] = LoadClip(sittingUpClipName);
         }
 
         public void Play(CaveheartState state)
@@ -61,6 +74,11 @@ namespace MyLittleCaveheart
 
         private void Update()
         {
+            if (!animateFrames)
+            {
+                return;
+            }
+
             if (targetRenderer == null || !clips.TryGetValue(currentState, out var clip) || clip == null || clip.Length == 0)
             {
                 return;
@@ -91,7 +109,7 @@ namespace MyLittleCaveheart
         private Sprite[] LoadClip(string clipName)
         {
             var frames = new List<Sprite>();
-            for (var i = 0; i < 4; i++)
+            for (var i = 0; i < Mathf.Max(1, frameCount); i++)
             {
                 var sprite = Resources.Load<Sprite>($"{resourceRoot}/{clipName}_{i}");
                 if (sprite != null)
@@ -101,6 +119,21 @@ namespace MyLittleCaveheart
             }
 
             return frames.ToArray();
+        }
+
+        private void ApplyRendererSettings()
+        {
+            if (targetRenderer != null && applySortingOrder)
+            {
+                targetRenderer.sortingOrder = sortingOrder;
+            }
+        }
+
+        private void OnValidate()
+        {
+            frameCount = Mathf.Max(1, frameCount);
+            framesPerSecond = Mathf.Max(0.1f, framesPerSecond);
+            ApplyRendererSettings();
         }
     }
 }

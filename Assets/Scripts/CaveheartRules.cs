@@ -9,23 +9,15 @@ namespace MyLittleCaveheart
         public const int StartledStress = 4;
         public const int SettledTrust = 3;
         public const int SettledMaxStress = 3;
-        public const int WaterTrustGate = 4;
         public const int TouchStressGate = 6;
         public const int HelpfulBlanketUses = 2;
         public const int HelpfulGentleTouchUses = 2;
-        public const int HelpfulWaterUses = 3;
+        public const int HelpfulWaterUses = 2;
         public const int HelpfulCurtainUses = 1;
-        public const int HelpfulScratchUses = 2;
-        public const int ScratchAwakeTrustGate = 3;
-        private const int StrongBestHintPercent = 30;
-
-        private static readonly CaveheartInteractionType[] ObserveHintCandidates =
-        {
-            CaveheartInteractionType.GentleTouch,
-            CaveheartInteractionType.OfferWater,
-            CaveheartInteractionType.OpenCurtain,
-            CaveheartInteractionType.Scratch
-        };
+        public const int HelpfulScratchUses = 1;
+        private const string WaterCue = "He looks toward the cup.";
+        private const string PlayCue = "One foot shifts toward your hand, as if he might play.";
+        private const string WaterAndPlayCue = "His eyes move between the cup and your hand. One foot rests outside the blanket.";
 
         public static int GetTimeCost(CaveheartInteractionType interaction)
         {
@@ -59,16 +51,6 @@ namespace MyLittleCaveheart
 
         public static CaveheartInteractionResult Apply(CaveheartStats current, CaveheartState currentState, CaveheartInteractionType interaction, CaveheartInteractionContext context)
         {
-            return Apply(current, currentState, interaction, context, true);
-        }
-
-        private static CaveheartInteractionResult Apply(
-            CaveheartStats current,
-            CaveheartState currentState,
-            CaveheartInteractionType interaction,
-            CaveheartInteractionContext context,
-            bool includeObserveHint)
-        {
             var before = current.Clamped();
             var next = before;
             var accepted = true;
@@ -78,50 +60,28 @@ namespace MyLittleCaveheart
             switch (interaction)
             {
                 case CaveheartInteractionType.Wait:
-                    if (before.stress >= ResistStress)
+                    if (before.stress >= StartledStress)
                     {
                         next.stress -= 2;
-                        if ((context.lastInteractionWasForceful || context.lastInteractionWasRejected) && context.waitStreak == 0)
+                        if (context.lastInteractionWasForceful && context.waitStreak == 0)
                         {
                             next.trust += 1;
                         }
 
                         message = "You give him space.";
-                        reaction = "His shaking slows.";
-                    }
-                    else if (before.stress >= StartledStress)
-                    {
-                        next.stress -= 2;
-                        if (context.waitStreak == 0)
-                        {
-                            next.trust += 1;
-                        }
-
-                        message = "You wait quietly.";
-                        reaction = "He peeks out for a moment.";
+                        reaction = "His body stops bracing quite so hard.";
                     }
                     else if (context.lastInteractionWasRejected && context.waitStreak == 0)
                     {
                         next.stress -= 1;
-                        if (CanBuildTrustAfterLowStressRejection(context.lastInteraction))
-                        {
-                            next.trust += 1;
-                            message = "You accept his no.";
-                            reaction = "He relaxes a little.";
-                        }
-                        else
-                        {
-                            message = "You give him a moment.";
-                            reaction = "The room settles.";
-                        }
+                        message = "You accept his no.";
+                        reaction = "The room settles.";
                     }
                     else
                     {
                         next.stress -= 1;
                         message = "You observe him.";
-                        reaction = context.waitStreak == 0
-                            ? "He moves a little, but gives no clear signal."
-                            : "The signal is still unclear.";
+                        reaction = "You watch his breathing and posture.";
                     }
                     break;
                 case CaveheartInteractionType.Alarm:
@@ -139,66 +99,39 @@ namespace MyLittleCaveheart
                     reaction = "He pushes back.";
                     break;
                 case CaveheartInteractionType.GentleTouch:
-                    if (before.stress >= TouchStressGate)
+                    if (context.lastInteraction == CaveheartInteractionType.GentleTouch)
                     {
-                        if (context.lastInteraction == CaveheartInteractionType.Wait && context.waitStreak > 0)
-                        {
-                            next.stress -= 2;
-                            next.trust += 1;
-                            message = "You touch him slowly.";
-                            reaction = "He flinches, then stays.";
-                        }
-                        else
-                        {
-                            accepted = false;
-                            next.stress += 1;
-                            next.trust -= 1;
-                            message = "The touch is too soon.";
-                            reaction = "He dodges your hand.";
-                        }
+                        accepted = false;
+                        next.stress += 1;
+                        message = "The touch repeats too soon.";
+                        reaction = "He moves his head away.";
+                    }
+                    else if (context.gentleTouchUses >= HelpfulGentleTouchUses)
+                    {
+                        accepted = false;
+                        next.stress += 1;
+                        message = "He has had enough touch for now.";
+                        reaction = "He tucks his head away.";
+                    }
+                    else if (before.stress >= TouchStressGate)
+                    {
+                        accepted = false;
+                        next.stress += 1;
+                        next.trust -= 1;
+                        message = "The touch is too soon.";
+                        reaction = "He dodges your hand.";
                     }
                     else
                     {
-                        if (context.gentleTouchUses >= HelpfulGentleTouchUses
-                            && context.lastInteraction == CaveheartInteractionType.Wait
-                            && context.waitStreak > 0
-                            && before.trust < SitUpTrust)
-                        {
-                            next.trust += 1;
-                            next.stress -= 1;
-                            message = "You touch him after waiting.";
-                            reaction = "He lets you help a little more.";
-                        }
-                        else if (context.gentleTouchUses >= HelpfulGentleTouchUses)
-                        {
-                            accepted = false;
-                            next.stress += 1;
-                            next.trust -= 1;
-                            message = "That is too much touching.";
-                            reaction = "He pulls away.";
-                        }
-                        else if (context.lastInteraction == CaveheartInteractionType.GentleTouch)
-                        {
-                            accepted = false;
-                            next.stress += 1;
-                            message = "The touch repeats too soon.";
-                            reaction = "He shifts away.";
-                        }
-                        else
-                        {
-                            next.trust += 1;
-                            next.stress -= 1;
-                            message = "You touch him gently.";
-                            reaction = context.gentleTouchUses == 0
-                                ? "His breathing slows."
-                                : "He accepts it, then needs space.";
-                        }
+                        next.trust += 1;
+                        next.stress -= 1;
+                        message = "You stroke his hair slowly.";
+                        reaction = context.lastInteraction == CaveheartInteractionType.Wait
+                            ? "He lets your hand rest there."
+                            : "His breathing becomes steadier.";
                     }
                     break;
                 case CaveheartInteractionType.OfferWater:
-                    var hasObservedBodySignal = context.lastInteraction == CaveheartInteractionType.Wait && context.waitStreak > 0;
-                    var isCalmEnoughToDrink = before.stress <= StartledStress;
-                    var isBodyReadyToDrink = IsBodyReadyToDrink(before, context.lastInteraction);
                     if (context.waterUses >= HelpfulWaterUses)
                     {
                         accepted = false;
@@ -213,14 +146,14 @@ namespace MyLittleCaveheart
                         message = "Water is offered again too soon.";
                         reaction = "He keeps the cup away.";
                     }
-                    else if (!isCalmEnoughToDrink)
+                    else if (before.stress > StartledStress)
                     {
                         accepted = false;
                         next.stress += 1;
                         message = "He is too tense for water.";
                         reaction = "He turns away from the cup.";
                     }
-                    else if (before.trust >= SettledTrust && isBodyReadyToDrink)
+                    else if (HasThirstCue(before, context.lastInteraction) && before.trust >= 2)
                     {
                         next.awake += 2;
                         next.trust += 1;
@@ -228,45 +161,20 @@ namespace MyLittleCaveheart
                         message = "You offer water.";
                         reaction = "He drinks a little.";
                     }
-                    else if (currentState == CaveheartState.Settled
-                        && before.trust >= SettledTrust
-                        && before.stress <= 1
-                        && context.lastInteraction != CaveheartInteractionType.OpenCurtain)
-                    {
-                        next.awake += 1;
-                        next.stress -= 1;
-                        message = "You offer water.";
-                        reaction = "He takes a small sip.";
-                    }
-                    else if (before.trust >= WaterTrustGate && before.stress <= SettledMaxStress)
-                    {
-                        next.awake += 1;
-                        next.stress -= 1;
-                        message = "You offer water.";
-                        reaction = "He takes a small sip.";
-                    }
-                    else if (before.stress <= SettledMaxStress && hasObservedBodySignal)
+                    else if (HasThirstCue(before, context.lastInteraction))
                     {
                         accepted = false;
                         message = "You offer water.";
-                        reaction = "He does not drink.";
-                    }
-                    else if (before.stress <= SettledMaxStress)
-                    {
-                        accepted = false;
-                        message = "You offer water.";
-                        reaction = "He does not drink.";
+                        reaction = "He looks at the cup, but does not take it from you.";
                     }
                     else
                     {
                         accepted = false;
-                        next.stress += 1;
-                        message = "He is not ready for water.";
-                        reaction = "He turns away.";
+                        message = "You offer water.";
+                        reaction = "His eyes do not follow the cup. He is not asking for water.";
                     }
                     break;
                 case CaveheartInteractionType.OpenCurtain:
-                    var hasLightWarning = context.lastInteraction == CaveheartInteractionType.Wait && context.waitStreak > 0;
                     if (context.curtainUses >= HelpfulCurtainUses)
                     {
                         accepted = false;
@@ -274,31 +182,25 @@ namespace MyLittleCaveheart
                         message = "The curtain moves again.";
                         reaction = "He squints.";
                     }
+                    else if (context.lastInteraction == CaveheartInteractionType.Wait && before.stress <= SettledMaxStress)
+                    {
+                        next.awake += 3;
+                        message = "You open the curtain slowly.";
+                        reaction = "The light reaches him without making him pull away.";
+                    }
+                    else if (before.awake == 0)
+                    {
+                        next.awake += 2;
+                        next.stress += 1;
+                        message = "You open the curtain a little.";
+                        reaction = "A thin line of light enters. He curls up, but does not panic.";
+                    }
                     else
                     {
                         next.awake += 2;
-                        var lightHasConsent = currentState == CaveheartState.Settled || hasLightWarning;
-                        if (before.awake == 0)
-                        {
-                            next.awake -= 1;
-                            next.stress += 1;
-                            message = "You open the curtain a little.";
-                            reaction = "A thin line of light enters. He curls up, but does not panic.";
-                        }
-                        else if (before.trust >= SettledTrust && before.stress <= StartledStress && lightHasConsent)
-                        {
-                            next.stress -= 1;
-                            message = "You open the curtain slowly.";
-                            reaction = "He blinks at the light.";
-                        }
-                        else
-                        {
-                            next.awake -= 1;
-                            next.stress += 2;
-                            next.trust -= 1;
-                            message = "The light is too sudden.";
-                            reaction = "He pulls the blanket up.";
-                        }
+                        next.stress += 1;
+                        message = "You open the curtain.";
+                        reaction = "He wakes, but the light catches him before he is ready.";
                     }
                     break;
                 case CaveheartInteractionType.TuckBlanket:
@@ -337,117 +239,82 @@ namespace MyLittleCaveheart
                     }
                     break;
                 case CaveheartInteractionType.Scratch:
-                    if (before.stress >= TouchStressGate)
+                    if (context.scratchUses >= HelpfulScratchUses
+                        || context.lastInteraction == CaveheartInteractionType.Scratch)
                     {
                         accepted = false;
-                        next.awake += 1;
                         next.stress += 1;
-                        next.trust -= 1;
-                        message = "He is too tense for play.";
-                        reaction = "He curls away.";
+                        message = "The playful scratch is repeated.";
+                        reaction = "He pulls his feet under the blanket.";
                     }
-                    else if (context.lastInteraction == CaveheartInteractionType.Scratch)
+                    else if (before.awake == 0 || before.stress >= StartledStress)
                     {
                         accepted = false;
-                        next.awake += 1;
-                        next.stress += 2;
-                        next.trust -= 1;
-                        message = "The scratch repeats too soon.";
-                        reaction = "He twists away.";
-                    }
-                    else if (context.scratchUses >= HelpfulScratchUses)
-                    {
-                        accepted = false;
-                        next.awake += 1;
                         next.stress += 1;
-                        next.trust -= 1;
-                        message = "That is too much scratching.";
-                        reaction = "He twists away.";
+                        message = "He is not ready to play.";
+                        reaction = before.awake == 0
+                            ? "His feet pull away without waking."
+                            : "His body is too tight for a joke.";
                     }
-                    else if (before.awake == 0)
-                    {
-                        accepted = false;
-                        next.awake += 2;
-                        next.stress += 1;
-                        next.trust -= 1;
-                        message = "You try a playful scratch.";
-                        reaction = "He jolts awake a little, but turns away.";
-                    }
-                    else if (before.trust < SettledTrust
-                        && before.awake >= 1
-                        && before.stress <= 2
-                        && context.lastInteraction == CaveheartInteractionType.Wait
-                        && context.waitStreak > 0)
-                    {
-                        next.awake += 1;
-                        next.trust += 2;
-                        next.stress += 2;
-                        message = "You try a playful scratch after watching him.";
-                        reaction = "He laughs before he can stop himself, then hides again.";
-                    }
-                    else if (before.awake >= ScratchAwakeTrustGate && before.trust >= 2)
+                    else if (HasPlaySignal(before))
                     {
                         next.awake += 2;
+                        next.trust += 1;
                         next.stress += 1;
-                        if (before.trust >= SettledTrust && context.lastInteraction == CaveheartInteractionType.Wait && context.waitStreak > 0)
-                        {
-                            next.trust += 1;
-                        }
-
-                        message = "You scratch him lightly.";
-                        reaction = "He gives a sleepy laugh.";
-                    }
-                    else if (currentState == CaveheartState.Settled && before.trust >= SettledTrust && before.stress <= 1)
-                    {
-                        next.awake += 1;
-                        next.stress += 1;
-                        message = "You scratch him lightly.";
-                        reaction = "He stirs, but is not ready to play.";
+                        message = "You lightly scratch the sole of his foot.";
+                        reaction = "He laughs and nudges your hand before hiding his foot again.";
                     }
                     else
                     {
-                        accepted = false;
                         next.awake += 1;
-                        next.trust -= 1;
                         next.stress += 1;
-                        message = "He is not ready for play.";
-                        reaction = "He turns away.";
+                        message = "You try a small playful scratch.";
+                        reaction = "He wakes a little, but does not join the game.";
                     }
                     break;
             }
 
             next = next.Clamped();
             var state = EvaluateState(next, currentState);
-            if (includeObserveHint && interaction == CaveheartInteractionType.Wait)
+            if (interaction == CaveheartInteractionType.Wait)
             {
-                var observeHint = BuildObserveHint(before, next, currentState, state, context);
-                if (!string.IsNullOrEmpty(observeHint))
-                {
-                    reaction = string.IsNullOrEmpty(reaction) || IsGenericObserveReaction(reaction)
-                        ? observeHint
-                        : reaction + "\n" + observeHint;
-                }
+                reaction = BuildObserveReport(before, next, currentState, context);
             }
 
-            reaction = AddWaterReadyCue(reaction, next, interaction, context);
+            reaction = AddNextChoiceCue(reaction, next, interaction, context);
             return new CaveheartInteractionResult(interaction, before, next, state, accepted, message, reaction);
         }
 
-        private static string AddWaterReadyCue(
+        private static string AddNextChoiceCue(
             string reaction,
             CaveheartStats statsAfterAction,
             CaveheartInteractionType interaction,
             CaveheartInteractionContext context)
         {
-            const string cue = "He looks toward the cup.";
-            if (!CanUseStrongWaterNext(statsAfterAction, interaction, context) || reaction.Contains(cue))
+            var canUseWater = CanUseStrongWaterNext(statsAfterAction, interaction, context);
+            var canUseScratch = CanUseStrongScratchNext(statsAfterAction, interaction, context);
+            if (!canUseWater && !canUseScratch)
             {
                 return reaction;
             }
 
-            return string.IsNullOrEmpty(reaction) || IsGenericObserveReaction(reaction)
-                ? cue
-                : reaction + "\n" + cue;
+            var cue = canUseWater && canUseScratch
+                ? WaterAndPlayCue
+                : canUseWater
+                    ? WaterCue
+                    : PlayCue;
+            var alreadyShowsWater = reaction.Contains("cup");
+            var alreadyShowsScratch = reaction.Contains("foot")
+                || reaction.Contains("feet")
+                || reaction.Contains("play");
+            if ((canUseWater && canUseScratch && alreadyShowsWater && alreadyShowsScratch)
+                || (canUseWater && !canUseScratch && alreadyShowsWater)
+                || (!canUseWater && canUseScratch && alreadyShowsScratch))
+            {
+                return reaction;
+            }
+
+            return string.IsNullOrEmpty(reaction) ? cue : reaction + "\n" + cue;
         }
 
         private static bool CanUseStrongWaterNext(
@@ -457,86 +324,114 @@ namespace MyLittleCaveheart
         {
             return lastInteraction != CaveheartInteractionType.OfferWater
                 && context.waterUses < HelpfulWaterUses
-                && statsAfterAction.trust >= SettledTrust
-                && statsAfterAction.stress <= StartledStress
-                && IsBodyReadyToDrink(statsAfterAction, lastInteraction);
+                && statsAfterAction.trust >= 2
+                && HasThirstCue(statsAfterAction, lastInteraction);
         }
 
-        private static bool IsGenericObserveReaction(string reaction)
+        private static bool CanUseStrongScratchNext(
+            CaveheartStats statsAfterAction,
+            CaveheartInteractionType lastInteraction,
+            CaveheartInteractionContext context)
         {
-            return reaction == "He moves a little, but gives no clear signal."
-                || reaction == "The signal is still unclear.";
+            return lastInteraction != CaveheartInteractionType.Scratch
+                && context.scratchUses < HelpfulScratchUses
+                && HasPlaySignal(statsAfterAction);
         }
 
-        private static string BuildObserveHint(
+        private static string BuildObserveReport(
             CaveheartStats beforeObserve,
             CaveheartStats afterObserve,
             CaveheartState stateBeforeObserve,
-            CaveheartState stateAfterObserve,
             CaveheartInteractionContext context)
         {
+            var report = GetBodyStageText(afterObserve) + "\n" + GetRelationshipText(afterObserve);
             if (IsFreshOpeningObserve(beforeObserve, stateBeforeObserve, context))
             {
-                return string.Empty;
+                return report;
             }
 
-            var nextContext = new CaveheartInteractionContext(
-                context.blanketUses,
-                context.gentleTouchUses,
-                context.waterUses,
-                context.curtainUses,
-                CaveheartInteractionType.Wait,
-                context.waitStreak + 1,
-                false,
-                false,
-                context.scratchUses);
-
-            var bestAction = ObserveHintCandidates[0];
-            var worstAction = ObserveHintCandidates[0];
-            var bestScore = int.MinValue;
-            var secondBestScore = int.MinValue;
-            var worstScore = int.MaxValue;
-            var secondWorstScore = int.MaxValue;
-
-            for (var i = 0; i < ObserveHintCandidates.Length; i++)
+            string cue;
+            var canUseWater = CanUseStrongWaterNext(afterObserve, CaveheartInteractionType.Wait, context);
+            var canUseScratch = CanUseStrongScratchNext(afterObserve, CaveheartInteractionType.Wait, context);
+            if (canUseWater && canUseScratch)
             {
-                var candidate = ObserveHintCandidates[i];
-                var result = Apply(afterObserve, stateAfterObserve, candidate, nextContext, false);
-                var score = ScoreCandidate(result);
-
-                if (score > bestScore)
-                {
-                    secondBestScore = bestScore;
-                    bestScore = score;
-                    bestAction = candidate;
-                }
-                else if (score > secondBestScore)
-                {
-                    secondBestScore = score;
-                }
-
-                if (score < worstScore)
-                {
-                    secondWorstScore = worstScore;
-                    worstScore = score;
-                    worstAction = candidate;
-                }
-                else if (score < secondWorstScore)
-                {
-                    secondWorstScore = score;
-                }
+                cue = WaterAndPlayCue;
             }
-
-            if (ShouldShowBestObserveHint(afterObserve, context))
+            else if (canUseWater)
             {
-                return bestScore >= 4 && bestScore - secondBestScore >= 2
-                    ? GetBestObserveHint(bestAction)
-                    : string.Empty;
+                cue = "His gaze keeps returning to the cup.";
+            }
+            else if (context.lastInteractionWasForceful)
+            {
+                cue = "His feet stay tucked away, but he leaves his head within reach of a slow touch.";
+            }
+            else if (afterObserve.stress >= StartledStress)
+            {
+                cue = "His shoulders stay tight. More stimulation would crowd him.";
+            }
+            else if (canUseScratch)
+            {
+                cue = "His feet shift toward your hand, as if he might play.";
+            }
+            else if (context.curtainUses == 0 && afterObserve.awake < 3 && afterObserve.stress <= SettledMaxStress)
+            {
+                cue = "His body is calm, but his eyes are still heavy. His gaze does not settle on the cup.";
+            }
+            else if (afterObserve.trust < SettledTrust && afterObserve.stress <= SettledMaxStress)
+            {
+                cue = "He leaves his head within reach, but waits to see what you do.";
+            }
+            else
+            {
+                cue = string.Empty;
             }
 
-            return worstScore <= -5 && secondWorstScore - worstScore >= 2
-                ? GetAvoidObserveHint(worstAction)
-                : string.Empty;
+            return string.IsNullOrEmpty(cue) ? report : report + "\n" + cue;
+        }
+
+        private static string GetBodyStageText(CaveheartStats stats)
+        {
+            if (stats.awake == 0)
+            {
+                return "Body: He is still in deep sleep.";
+            }
+
+            if (stats.awake <= 2)
+            {
+                return "Body: He is starting to wake, but his eyes are still heavy.";
+            }
+
+            if (stats.awake <= 5)
+            {
+                return "Body: He is half-awake and following the room.";
+            }
+
+            return "Body: He is awake enough to sit up.";
+        }
+
+        private static string GetRelationshipText(CaveheartStats stats)
+        {
+            if (stats.stress >= TouchStressGate)
+            {
+                return "Relationship: He is defensive and protecting himself.";
+            }
+
+            if (stats.stress >= StartledStress)
+            {
+                return "Relationship: He is guarded and watching for pressure.";
+            }
+
+            if (stats.trust >= 5)
+            {
+                return "Relationship: He is actively showing you what he needs.";
+            }
+
+            if (stats.trust >= SettledTrust)
+            {
+                return "Relationship: He is accepting your help.";
+            }
+
+            return "Relationship: He is hesitant, but still watching you.";
         }
 
         private static bool IsFreshOpeningObserve(CaveheartStats beforeObserve, CaveheartState stateBeforeObserve, CaveheartInteractionContext context)
@@ -550,107 +445,23 @@ namespace MyLittleCaveheart
                 && context.waterUses == 0
                 && context.curtainUses == 0
                 && context.scratchUses == 0
-                && context.lastInteraction == CaveheartInteractionType.Wait
                 && context.waitStreak == 0
                 && !context.lastInteractionWasForceful
                 && !context.lastInteractionWasRejected;
         }
 
-        private static bool ShouldShowBestObserveHint(CaveheartStats afterObserve, CaveheartInteractionContext context)
+        private static bool HasThirstCue(CaveheartStats stats, CaveheartInteractionType lastInteraction)
         {
-            var hash = afterObserve.awake * 31
-                + afterObserve.trust * 17
-                + afterObserve.stress * 13
-                + context.blanketUses * 11
-                + context.gentleTouchUses * 7
-                + context.waterUses * 5
-                + context.curtainUses * 3
-                + context.scratchUses * 19
-                + context.waitStreak;
-
-            if (hash < 0)
-            {
-                hash = -hash;
-            }
-
-            return hash % 100 < StrongBestHintPercent;
+            return stats.awake >= 3
+                && stats.stress <= SettledMaxStress
+                && lastInteraction != CaveheartInteractionType.OpenCurtain;
         }
 
-        private static bool IsBodyReadyToDrink(CaveheartStats stats, CaveheartInteractionType lastInteraction)
+        private static bool HasPlaySignal(CaveheartStats stats)
         {
-            return stats.awake >= 4 && lastInteraction != CaveheartInteractionType.OpenCurtain;
-        }
-
-        private static int ScoreCandidate(CaveheartInteractionResult result)
-        {
-            var awakeDelta = result.after.awake - result.before.awake;
-            var trustDelta = result.after.trust - result.before.trust;
-            var stressDelta = result.after.stress - result.before.stress;
-
-            var score = awakeDelta;
-            score += trustDelta * 4;
-            score -= stressDelta * 2;
-
-            if (!result.accepted)
-            {
-                score -= 4;
-            }
-
-            if (trustDelta < 0)
-            {
-                score += trustDelta * 2;
-            }
-
-            if (result.after.stress >= ResistStress)
-            {
-                score -= 6;
-            }
-
-            if (result.state == CaveheartState.SittingUp)
-            {
-                score += 8;
-            }
-
-            return score;
-        }
-
-        private static string GetBestObserveHint(CaveheartInteractionType action)
-        {
-            switch (action)
-            {
-                case CaveheartInteractionType.GentleTouch:
-                    return "He stays close enough that a slow touch could help.";
-                case CaveheartInteractionType.OfferWater:
-                    return "His body looks ready for a small sip.";
-                case CaveheartInteractionType.OpenCurtain:
-                    return "A little morning light may help him stir.";
-                case CaveheartInteractionType.Scratch:
-                    return "There is a tiny playful twitch under the blanket.";
-                default:
-                    return string.Empty;
-            }
-        }
-
-        private static string GetAvoidObserveHint(CaveheartInteractionType action)
-        {
-            switch (action)
-            {
-                case CaveheartInteractionType.GentleTouch:
-                    return "He is still tucked inward. Getting close now would crowd him.";
-                case CaveheartInteractionType.OfferWater:
-                    return "He is not looking for the cup yet. Offering water now would interrupt him.";
-                case CaveheartInteractionType.OpenCurtain:
-                    return "His eyes are still guarded. More light now would be too sudden.";
-                case CaveheartInteractionType.Scratch:
-                    return "His body is too braced for play. A joke now would feel like pressure.";
-                default:
-                    return string.Empty;
-            }
-        }
-
-        private static bool CanBuildTrustAfterLowStressRejection(CaveheartInteractionType rejectedInteraction)
-        {
-            return rejectedInteraction == CaveheartInteractionType.GentleTouch;
+            return stats.awake >= 2
+                && stats.awake <= 5
+                && stats.stress <= 1;
         }
 
         public static CaveheartState EvaluateState(CaveheartStats stats, CaveheartState currentState = CaveheartState.Sleeping)

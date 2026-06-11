@@ -7,7 +7,11 @@ namespace MyLittleCaveheart
     public sealed class CaveheartSceneBootstrapper : MonoBehaviour
     {
         [SerializeField] private bool buildOnEnable = true;
+        [SerializeField] private bool allowRuntimeBuild;
         [SerializeField] private bool rebuildEveryPlay = true;
+        [SerializeField] private Vector3 animatedSpritePosition = new Vector3(0f, -0.35f, -0.55f);
+        [SerializeField] private Vector3 animatedSpriteScale = new Vector3(2.2f, 2.2f, 1f);
+        [SerializeField] private int animatedSpriteSortingOrder = 80;
 
         private Sprite squareSprite;
 
@@ -18,14 +22,18 @@ namespace MyLittleCaveheart
                 return;
             }
 
-            if (!Application.isPlaying && transform.childCount > 0)
+            if (Application.isPlaying)
             {
+                if (allowRuntimeBuild && (rebuildEveryPlay || transform.childCount == 0))
+                {
+                    Build();
+                }
+
                 return;
             }
 
-            if (Application.isPlaying && rebuildEveryPlay)
+            if (transform.childCount > 0)
             {
-                Build();
                 return;
             }
 
@@ -55,15 +63,18 @@ namespace MyLittleCaveheart
             warmLight.transform.rotation = Quaternion.Euler(0f, 0f, -22f);
             var stressPulse = CreateSprite("Stress Pulse Overlay", new Vector3(0f, 0f, 4.8f), new Vector3(24f, 14f, 1f), new Color(1f, 0.25f, 0.18f, 0f), 21);
 
-            CreateInteractable(controller, CaveheartInteractionType.Alarm, "Alarm", new Vector3(-6.1f, -0.9f, 0f), new Vector2(1.15f, 1.15f), new Color(0.95f, 0.23f, 0.23f));
-            CreateInteractable(controller, CaveheartInteractionType.GentleTouch, "Gentle Touch", new Vector3(0.1f, 0.55f, 0f), new Vector2(2.0f, 0.75f), new Color(0.9f, 0.62f, 0.52f));
-            CreateInteractable(controller, CaveheartInteractionType.OfferWater, "Water", new Vector3(5.55f, -1.1f, 0f), new Vector2(1.0f, 1.25f), new Color(0.34f, 0.72f, 0.9f));
-            CreateInteractable(controller, CaveheartInteractionType.OpenCurtain, "Curtain", new Vector3(5.9f, 1.8f, 0f), new Vector2(1.4f, 3.4f), new Color(0.95f, 0.79f, 0.28f));
-            CreateInteractable(controller, CaveheartInteractionType.Scratch, "Scratch", new Vector3(-1.4f, 0.45f, 0f), new Vector2(1.15f, 0.75f), new Color(1f, 0.58f, 0.72f));
+            CreateInteractable(controller, CaveheartInteractionType.Alarm, "Alarm", new Vector3(-6.25f, -1.35f, 0f), new Vector2(1.8f, 2.2f), new Color(0.95f, 0.23f, 0.23f));
+            CreateInteractable(controller, CaveheartInteractionType.GentleTouch, "Touch Head", new Vector3(-0.35f, -0.55f, 0f), new Vector2(2.4f, 1.5f), new Color(0.9f, 0.62f, 0.52f));
+            CreateInteractable(controller, CaveheartInteractionType.Scratch, "Scratch Feet", new Vector3(0.35f, -3.25f, 0f), new Vector2(2.3f, 0.9f), new Color(1f, 0.58f, 0.72f));
+            CreateInteractable(controller, CaveheartInteractionType.OfferWater, "Water", new Vector3(6.15f, -2.65f, 0f), new Vector2(2.5f, 1.55f), new Color(0.34f, 0.72f, 0.9f));
+            CreateInteractable(controller, CaveheartInteractionType.OpenCurtain, "Curtain", new Vector3(5.55f, 1.65f, 0f), new Vector2(2.4f, 3.6f), new Color(0.95f, 0.79f, 0.28f));
+            CreateInteractable(controller, CaveheartInteractionType.Wait, "Observe", Vector3.zero, new Vector2(18f, 10f), Color.clear);
 
             CreateUi();
             var presenter = controller.gameObject.AddComponent<CaveheartWhiteboxPresenter>();
             presenter.Configure(controller, body, blanket, face, leftArm, rightArm, tear, coldOverlay, warmLight, stressPulse, characterRoot.transform);
+            var animatedSprite = CreateAnimatedCharacterSprite();
+            controller.gameObject.AddComponent<CaveheartSpriteAnimator>().Configure(animatedSprite);
         }
 
         private Camera EnsureMainCamera()
@@ -125,8 +136,8 @@ namespace MyLittleCaveheart
 
         private void CreateInteractable(CaveheartGameController controller, CaveheartInteractionType type, string label, Vector3 position, Vector2 size, Color color)
         {
-            var item = CreateSprite($"Interactable - {label}", position, new Vector3(size.x, size.y, 1f), color, 10).gameObject;
-            item.AddComponent<BoxCollider2D>().size = Vector2.one;
+            var item = CreateSprite($"Interactable - {label}", position, Vector3.one, color, 10).gameObject;
+            item.AddComponent<BoxCollider2D>().size = size;
             item.AddComponent<CaveheartClickable>().Configure(controller, type);
             CreateWorldLabel(label, position + new Vector3(0f, -size.y * 0.62f, -0.1f), item.transform);
         }
@@ -140,6 +151,14 @@ namespace MyLittleCaveheart
             renderer.sprite = squareSprite;
             renderer.color = color;
             renderer.sortingOrder = sortingOrder;
+            return renderer;
+        }
+
+        private SpriteRenderer CreateAnimatedCharacterSprite()
+        {
+            var sprite = Resources.Load<Sprite>("Sprites/Caveheart/sleeping_0");
+            var renderer = CreateSprite("Little Caveheart Animated Sprite", animatedSpritePosition, animatedSpriteScale, Color.white, animatedSpriteSortingOrder);
+            renderer.sprite = sprite;
             return renderer;
         }
 

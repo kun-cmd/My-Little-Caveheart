@@ -81,11 +81,6 @@ namespace MyLittleCaveheart
                     break;
             }
 
-            if (!hasAcceptedWater && state != CaveheartState.SittingUp && stats.trust >= CaveheartRules.WaterTrustGate)
-            {
-                SetSpeech("...");
-            }
-
             if (tear != null)
             {
                 tear.gameObject.SetActive(state == CaveheartState.Resisting || (state == CaveheartState.Startled && stats.stress >= CaveheartRules.StartledStress));

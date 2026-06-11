@@ -8,13 +8,29 @@ namespace MyLittleCaveheart
     {
         [SerializeField] private CaveheartGameController controller;
         [SerializeField] private CaveheartInteractionType interactionType;
-        [SerializeField] private CaveheartClickFeedback clickFeedback;
         [SerializeField] private SpriteRenderer targetRenderer;
 
         public CaveheartInteractionType InteractionType
         {
             get => interactionType;
             set => interactionType = value;
+        }
+
+        public int HoverPriority
+        {
+            get
+            {
+                switch (interactionType)
+                {
+                    case CaveheartInteractionType.Wait:
+                        return 0;
+                    case CaveheartInteractionType.GentleTouch:
+                    case CaveheartInteractionType.Scratch:
+                        return 20;
+                    default:
+                        return 10;
+                }
+            }
         }
 
         public SpriteRenderer TargetRenderer
@@ -34,42 +50,52 @@ namespace MyLittleCaveheart
         {
             controller = targetController;
             interactionType = type;
-            EnsureClickFeedback();
+            HideDebugVisuals();
         }
 
         private void OnEnable()
         {
-            EnsureClickFeedback();
+            HideDebugVisuals();
         }
 
         private void Reset()
         {
-            EnsureClickFeedback();
+            HideDebugVisuals();
         }
 
-        private void EnsureClickFeedback()
+        public bool TryInteract()
+        {
+            if (controller == null)
+            {
+                controller = FindObjectOfType<CaveheartGameController>();
+            }
+
+            if (controller == null || !controller.IsInteractionAvailable(interactionType))
+            {
+                return false;
+            }
+
+            controller.Interact(interactionType);
+            return true;
+        }
+
+        public void HideDebugVisuals()
         {
             if (targetRenderer == null)
             {
                 targetRenderer = GetComponent<SpriteRenderer>();
             }
 
-            if (clickFeedback == null)
+            if (targetRenderer != null)
             {
-                clickFeedback = Application.isPlaying
-                    ? CaveheartClickFeedback.GetOrCreateActive()
-                    : FindObjectOfType<CaveheartClickFeedback>();
+                targetRenderer.enabled = false;
             }
 
-            if (clickFeedback != null && Application.isPlaying && !clickFeedback.gameObject.activeInHierarchy)
+            var labels = GetComponentsInChildren<MeshRenderer>(true);
+            for (var i = 0; i < labels.Length; i++)
             {
-                clickFeedback = CaveheartClickFeedback.GetOrCreateActive();
+                labels[i].enabled = false;
             }
-        }
-
-        private void OnMouseDown()
-        {
-            // Scene props are visual signals now. Actions are taken from the bottom bar.
         }
     }
 }

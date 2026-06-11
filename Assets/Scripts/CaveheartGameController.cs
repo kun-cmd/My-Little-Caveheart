@@ -7,6 +7,9 @@ namespace MyLittleCaveheart
 {
     public sealed class CaveheartGameController : MonoBehaviour
     {
+        private const string OpeningGoalText = "Help him sit up gently. Watch if he is awake, safe, and calm.";
+        private const string CurtainBackgroundObjectName = "caveheart_morning_cave_bedroom_bg_v1";
+
         private enum MorningOutcome
         {
             Bad,
@@ -21,8 +24,22 @@ namespace MyLittleCaveheart
         [SerializeField] private bool showWhiteboxHud = false;
         [SerializeField] private int morningTimeLimitMinutes = 14;
 
+        [Header("World Interaction Zones")]
+        [SerializeField] private Collider2D urgeZone;
+        [SerializeField] private Collider2D touchHeadZone;
+        [SerializeField] private Collider2D scratchFeetZone;
+        [SerializeField] private Collider2D waterZone;
+        [SerializeField] private Collider2D windowZone;
+        [SerializeField] private Collider2D observeZone;
+
+        [Header("Curtain Background")]
+        [SerializeField] private SpriteRenderer curtainBackgroundRenderer;
+        [SerializeField] private Sprite closedCurtainBackground;
+        [SerializeField] private Sprite openCurtainBackground;
+
         public event Action<CaveheartInteractionResult> InteractionResolved;
         public event Action<CaveheartState, CaveheartStats> StateChanged;
+        public event Action<CaveheartInteractionType?, Vector3> InteractionHoverChanged;
 
         private Text hudValuesText;
         private Text hudStateText;
@@ -33,6 +50,9 @@ namespace MyLittleCaveheart
         private RectTransform hudStressFill;
         private Text hudOutcomeText;
         private Image hudOutcomePanel;
+        private Button hudRestartButton;
+        private Text hudHoverText;
+        private RectTransform hudHoverRect;
         private float elapsedSeconds;
         private int usedMorningMinutes;
         private int blanketUseCount;
@@ -41,6 +61,7 @@ namespace MyLittleCaveheart
         private int curtainUseCount;
         private int scratchUseCount;
         private int forcefulUseCount;
+        private int rejectedActionCount;
         private bool hasAcceptedWater;
         private bool hasMorningClosed;
         private CaveheartCharacterView characterView;
@@ -50,6 +71,17 @@ namespace MyLittleCaveheart
         private bool lastInteractionWasRejected;
         private CaveheartSpriteAnimator spriteAnimator;
         private CaveheartEnvironmentFeedback environmentFeedback;
+        private CaveheartClickable hoveredInteractionZone;
+        private Vector3 hoveredInteractionWorldPosition;
+        private CaveheartInteractionType? hoveredInteraction;
+        private bool hoveredInteractionAvailable;
+        private float hoverStartedAt;
+        private Texture2D urgeCursor;
+        private Texture2D touchCursor;
+        private Texture2D waterCursor;
+        private Texture2D windowCursor;
+        private Texture2D scratchCursor;
+        private Texture2D observeCursor;
 
         public CaveheartStats Stats => stats;
         public CaveheartState CurrentState => currentState;
@@ -58,16 +90,24 @@ namespace MyLittleCaveheart
         public int RemainingMorningMinutes => Mathf.Max(0, morningTimeLimitMinutes - usedMorningMinutes);
         public bool HasMorningClosed => hasMorningClosed;
         public bool IsEnded => currentState == CaveheartState.SittingUp || hasMorningClosed;
+        public int RejectedActionCount => rejectedActionCount;
+        public CaveheartInteractionType? CurrentHoveredInteraction => hoveredInteraction;
+        public Vector3 HoveredInteractionWorldPosition => hoveredInteractionWorldPosition;
 
         private void Start()
         {
             BeginMorning();
+            EnsureCurtainBackground();
+            SetCurtainBackground(false);
             EnsureClickFeedbackObject();
             PruneRetiredInteractables();
+            EnsureWorldInteractionZones();
             EnsureCharacterView();
             EnsureSpriteAnimator();
             EnsureEnvironmentFeedback();
+            CaveheartBackgroundMusic.Ensure();
             EnsureWhiteboxHud();
+            ApplyInteractionCursor(null, false);
             PublishState();
             UpdateWhiteboxHudValues();
             UpdateStateText();
@@ -86,8 +126,32 @@ namespace MyLittleCaveheart
                 Debug.Log($"[Caveheart Whitebox] HUD visible: {showWhiteboxHud}", this);
             }
 
+            UpdateWorldInteractionInput();
+            UpdateHoverTooltip();
             UpdateWhiteboxHudValues();
             UpdateStateText();
+        }
+
+        public bool IsInteractionAvailable(CaveheartInteractionType interactionType)
+        {
+            if (lockAfterEnding && IsEnded)
+            {
+                return false;
+            }
+
+            switch (interactionType)
+            {
+                case CaveheartInteractionType.GentleTouch:
+                    return gentleTouchUseCount < CaveheartRules.HelpfulGentleTouchUses;
+                case CaveheartInteractionType.OfferWater:
+                    return waterUseCount < CaveheartRules.HelpfulWaterUses;
+                case CaveheartInteractionType.OpenCurtain:
+                    return curtainUseCount < CaveheartRules.HelpfulCurtainUses;
+                case CaveheartInteractionType.Scratch:
+                    return scratchUseCount < CaveheartRules.HelpfulScratchUses;
+                default:
+                    return true;
+            }
         }
 
         public CaveheartInteractionResult Interact(CaveheartInteractionType interactionType)
@@ -108,6 +172,21 @@ namespace MyLittleCaveheart
                     endedReaction);
                 InteractionResolved?.Invoke(ended);
                 return ended;
+            }
+
+            if (!IsInteractionAvailable(interactionType))
+            {
+                var unavailable = new CaveheartInteractionResult(
+                    interactionType,
+                    stats,
+                    stats,
+                    currentState,
+                    false,
+                    InteractionUnavailableText(interactionType),
+                    "You leave it there.");
+                UpdateWhiteboxHudReaction(unavailable);
+                InteractionResolved?.Invoke(unavailable);
+                return unavailable;
             }
 
             var actionMinutes = CaveheartRules.GetTimeCost(interactionType);
@@ -149,26 +228,38 @@ namespace MyLittleCaveheart
                     blanketUseCount++;
                     break;
                 case CaveheartInteractionType.GentleTouch:
-                    gentleTouchUseCount++;
-                    break;
-                case CaveheartInteractionType.OfferWater:
-                    waterUseCount++;
                     if (result.accepted)
                     {
+                        gentleTouchUseCount++;
+                    }
+                    break;
+                case CaveheartInteractionType.OfferWater:
+                    if (result.accepted)
+                    {
+                        waterUseCount++;
                         hasAcceptedWater = true;
                     }
                     break;
                 case CaveheartInteractionType.OpenCurtain:
                     curtainUseCount++;
+                    SetCurtainBackground(true);
                     break;
                 case CaveheartInteractionType.Scratch:
-                    scratchUseCount++;
+                    if (result.accepted)
+                    {
+                        scratchUseCount++;
+                    }
                     break;
             }
 
             stats = result.after;
             currentState = result.state;
             usedMorningMinutes += actionMinutes;
+            if (!result.accepted)
+            {
+                rejectedActionCount++;
+            }
+
             if (interactionType == CaveheartInteractionType.Alarm || interactionType == CaveheartInteractionType.ShakeBed)
             {
                 forcefulUseCount++;
@@ -206,11 +297,19 @@ namespace MyLittleCaveheart
         public void ResetMorning()
         {
             BeginMorning();
+            EnsureCurtainBackground();
+            SetCurtainBackground(false);
+            SetHoveredInteraction(null, Vector3.zero);
             PublishState();
             UpdateStateText();
             characterView?.SetHasAcceptedWater(hasAcceptedWater);
             characterView?.ApplyState(currentState, stats);
             spriteAnimator?.Play(currentState);
+            if (hudReactionText != null)
+            {
+                hudReactionText.text = OpeningGoalText;
+            }
+
             UpdateOutcomeUi();
         }
 
@@ -224,6 +323,7 @@ namespace MyLittleCaveheart
             curtainUseCount = 0;
             scratchUseCount = 0;
             forcefulUseCount = 0;
+            rejectedActionCount = 0;
             usedMorningMinutes = 0;
             hasAcceptedWater = false;
             hasMorningClosed = false;
@@ -278,6 +378,162 @@ namespace MyLittleCaveheart
                         DestroyImmediate(clickable.gameObject);
                     }
                 }
+            }
+        }
+
+        private void EnsureWorldInteractionZones()
+        {
+            EnsureInteractionZone(ref urgeZone, CaveheartInteractionType.Alarm, "Alarm", new Vector2(-6.25f, -1.35f), new Vector2(1.8f, 2.2f));
+            EnsureInteractionZone(ref touchHeadZone, CaveheartInteractionType.GentleTouch, "Touch Head", new Vector2(-0.35f, -0.55f), new Vector2(2.4f, 1.5f));
+            EnsureInteractionZone(ref scratchFeetZone, CaveheartInteractionType.Scratch, "Scratch Feet", new Vector2(0.35f, -3.25f), new Vector2(2.3f, 0.9f));
+            EnsureInteractionZone(ref waterZone, CaveheartInteractionType.OfferWater, "Water", new Vector2(6.15f, -2.65f), new Vector2(2.5f, 1.55f));
+            EnsureInteractionZone(ref windowZone, CaveheartInteractionType.OpenCurtain, "Curtain", new Vector2(5.55f, 1.65f), new Vector2(2.4f, 3.6f));
+            EnsureInteractionZone(ref observeZone, CaveheartInteractionType.Wait, "Observe", Vector2.zero, new Vector2(18f, 10f));
+        }
+
+        private void EnsureInteractionZone(
+            ref Collider2D zoneCollider,
+            CaveheartInteractionType interactionType,
+            string label,
+            Vector2 fallbackPosition,
+            Vector2 fallbackSize)
+        {
+            var zone = zoneCollider == null ? FindInteractionZone(interactionType) : zoneCollider.GetComponent<CaveheartClickable>();
+            if (zoneCollider == null && zone != null)
+            {
+                zoneCollider = zone.GetComponent<Collider2D>();
+            }
+
+            if (zoneCollider == null)
+            {
+                var zoneObject = new GameObject($"Interactable - {label}");
+                zoneObject.transform.position = new Vector3(fallbackPosition.x, fallbackPosition.y, 0f);
+                var boxCollider = zoneObject.AddComponent<BoxCollider2D>();
+                boxCollider.size = fallbackSize;
+                zoneCollider = boxCollider;
+                zone = zoneObject.AddComponent<CaveheartClickable>();
+            }
+            else if (zone == null)
+            {
+                zone = zoneCollider.gameObject.AddComponent<CaveheartClickable>();
+            }
+
+            zone.gameObject.SetActive(true);
+            zone.Configure(this, interactionType);
+        }
+
+        private static CaveheartClickable FindInteractionZone(CaveheartInteractionType interactionType)
+        {
+            var clickables = FindObjectsOfType<CaveheartClickable>(true);
+            for (var i = 0; i < clickables.Length; i++)
+            {
+                if (clickables[i] != null && clickables[i].InteractionType == interactionType)
+                {
+                    return clickables[i];
+                }
+            }
+
+            return null;
+        }
+
+        private void UpdateWorldInteractionInput()
+        {
+            if (!Application.isPlaying || (lockAfterEnding && IsEnded))
+            {
+                SetHoveredInteraction(null, Vector3.zero);
+                return;
+            }
+
+            if (EventSystem.current != null && EventSystem.current.IsPointerOverGameObject())
+            {
+                SetHoveredInteraction(null, Vector3.zero);
+                return;
+            }
+
+            var camera = Camera.main;
+            if (camera == null)
+            {
+                SetHoveredInteraction(null, Vector3.zero);
+                return;
+            }
+
+            var screenPoint = Input.mousePosition;
+            var worldPoint3D = camera.ScreenToWorldPoint(new Vector3(screenPoint.x, screenPoint.y, -camera.transform.position.z));
+            var worldPoint = new Vector2(worldPoint3D.x, worldPoint3D.y);
+            var hits = Physics2D.OverlapPointAll(worldPoint);
+            CaveheartClickable bestZone = null;
+
+            for (var i = 0; i < hits.Length; i++)
+            {
+                var candidate = hits[i].GetComponent<CaveheartClickable>();
+                if (candidate == null)
+                {
+                    continue;
+                }
+
+                if (bestZone == null || candidate.HoverPriority > bestZone.HoverPriority)
+                {
+                    bestZone = candidate;
+                }
+            }
+
+            SetHoveredInteraction(bestZone, worldPoint3D);
+            if (bestZone != null
+                && IsInteractionAvailable(bestZone.InteractionType)
+                && Input.GetMouseButtonDown(0))
+            {
+                bestZone.TryInteract();
+            }
+        }
+
+        private void SetHoveredInteraction(CaveheartClickable zone, Vector3 worldPosition)
+        {
+            var interactionChanged = hoveredInteractionZone != zone;
+            var positionChanged = (hoveredInteractionWorldPosition - worldPosition).sqrMagnitude > 0.0001f;
+            hoveredInteractionZone = zone;
+            hoveredInteractionWorldPosition = worldPosition;
+            var interaction = zone == null ? (CaveheartInteractionType?)null : zone.InteractionType;
+            var available = interaction.HasValue && IsInteractionAvailable(interaction.Value);
+
+            if (interactionChanged || hoveredInteraction != interaction || hoveredInteractionAvailable != available)
+            {
+                hoveredInteraction = interaction;
+                hoveredInteractionAvailable = available;
+                hoverStartedAt = Time.unscaledTime;
+                ApplyInteractionCursor(interaction, available);
+                InteractionHoverChanged?.Invoke(CurrentHoveredInteraction, worldPosition);
+            }
+            else if (zone != null && positionChanged)
+            {
+                InteractionHoverChanged?.Invoke(CurrentHoveredInteraction, worldPosition);
+            }
+        }
+
+        private void OnValidate()
+        {
+            BindExistingZone(ref urgeZone, CaveheartInteractionType.Alarm);
+            BindExistingZone(ref touchHeadZone, CaveheartInteractionType.GentleTouch);
+            BindExistingZone(ref scratchFeetZone, CaveheartInteractionType.Scratch);
+            BindExistingZone(ref waterZone, CaveheartInteractionType.OfferWater);
+            BindExistingZone(ref windowZone, CaveheartInteractionType.OpenCurtain);
+            BindExistingZone(ref observeZone, CaveheartInteractionType.Wait);
+            if (observeZone != null)
+            {
+                observeZone.enabled = true;
+            }
+        }
+
+        private static void BindExistingZone(ref Collider2D collider, CaveheartInteractionType interactionType)
+        {
+            if (collider != null)
+            {
+                return;
+            }
+
+            var zone = FindInteractionZone(interactionType);
+            if (zone != null)
+            {
+                collider = zone.GetComponent<Collider2D>();
             }
         }
 
@@ -344,10 +600,15 @@ namespace MyLittleCaveheart
             spriteAnimator = GetComponent<CaveheartSpriteAnimator>();
             if (spriteAnimator == null)
             {
-                spriteAnimator = gameObject.AddComponent<CaveheartSpriteAnimator>();
+                Debug.LogWarning("CaveheartSpriteAnimator is not configured on GameController. Use the editor installer before entering play mode.", this);
+                return;
             }
 
-            spriteAnimator.BindOrCreateRenderer();
+            if (!spriteAnimator.BindConfiguredRenderer())
+            {
+                return;
+            }
+
             spriteAnimator.LoadClips();
             spriteAnimator.Play(currentState);
         }
@@ -358,6 +619,37 @@ namespace MyLittleCaveheart
             if (environmentFeedback == null)
             {
                 environmentFeedback = gameObject.AddComponent<CaveheartEnvironmentFeedback>();
+            }
+        }
+
+        private void EnsureCurtainBackground()
+        {
+            if (curtainBackgroundRenderer == null)
+            {
+                var backgroundObject = GameObject.Find(CurtainBackgroundObjectName);
+                if (backgroundObject != null)
+                {
+                    curtainBackgroundRenderer = backgroundObject.GetComponent<SpriteRenderer>();
+                }
+            }
+
+            if (curtainBackgroundRenderer == null || closedCurtainBackground == null || openCurtainBackground == null)
+            {
+                Debug.LogWarning("Caveheart curtain backgrounds are not fully configured.", this);
+            }
+        }
+
+        private void SetCurtainBackground(bool isOpen)
+        {
+            if (curtainBackgroundRenderer == null)
+            {
+                return;
+            }
+
+            var targetSprite = isOpen ? openCurtainBackground : closedCurtainBackground;
+            if (targetSprite != null)
+            {
+                curtainBackgroundRenderer.sprite = targetSprite;
             }
         }
 
@@ -399,16 +691,162 @@ namespace MyLittleCaveheart
             RemoveObsoleteUiElement(uiRoot.transform, "Whitebox Runtime Time Text");
             RemoveObsoleteUiElement(uiRoot.transform, "Debug Text Toggle Mirror");
             RemoveObsoleteUiElement(uiRoot.transform, "Ending Text");
+            RemoveObsoleteUiElement(uiRoot.transform, "Observe Button");
 
             hudValuesText = FindOrCreateHudText(uiRoot.transform, "Whitebox Values Text", new Vector2(-24f, -72f), new Vector2(260f, 128f), TextAnchor.UpperRight, 20);
             hudStateText = FindOrCreateHudText(uiRoot.transform, "State Text", new Vector2(24f, -24f), new Vector2(420f, 56f), TextAnchor.UpperLeft, 24);
             FindOrCreateSignalBars(uiRoot.transform);
-            hudReactionText = FindOrCreateHudText(uiRoot.transform, "Reaction Text", new Vector2(24f, -76f), new Vector2(720f, 150f), TextAnchor.UpperLeft, 21);
+            hudReactionText = FindOrCreateHudText(uiRoot.transform, "Reaction Text", new Vector2(0f, -72f), new Vector2(760f, 190f), TextAnchor.UpperCenter, 20);
             hudTimeText = FindOrCreateHudText(uiRoot.transform, "Time Text", new Vector2(-24f, -24f), new Vector2(300f, 52f), TextAnchor.UpperRight, 22);
+            EnsureHoverTooltip(uiRoot.transform);
             FindOrCreateOutcomeUi(uiRoot.transform);
-            EnsureBottomActionBar(uiRoot.transform);
-            hudReactionText.text = "Morning is quiet.\nChoose how you approach him.";
+            RemoveActionButtons(uiRoot.transform);
+            hudReactionText.text = OpeningGoalText;
             UpdateStateText();
+        }
+
+        private void EnsureHoverTooltip(Transform parent)
+        {
+            hudHoverText = FindOrCreateHudText(
+                parent,
+                "Interaction Hover Text",
+                Vector2.zero,
+                new Vector2(260f, 58f),
+                TextAnchor.UpperLeft,
+                18);
+            hudHoverRect = hudHoverText.rectTransform;
+            hudHoverRect.anchorMin = new Vector2(0.5f, 0.5f);
+            hudHoverRect.anchorMax = new Vector2(0.5f, 0.5f);
+            hudHoverRect.pivot = new Vector2(0f, 1f);
+            hudHoverText.raycastTarget = false;
+            hudHoverText.gameObject.SetActive(false);
+        }
+
+        private void UpdateHoverTooltip()
+        {
+            if (hudHoverText == null || hudHoverRect == null)
+            {
+                return;
+            }
+
+            if (!hoveredInteraction.HasValue || Time.unscaledTime - hoverStartedAt < 0.35f)
+            {
+                hudHoverText.gameObject.SetActive(false);
+                return;
+            }
+
+            var interaction = hoveredInteraction.Value;
+            hudHoverText.text = hoveredInteractionAvailable
+                ? $"{InteractionDisplayName(interaction)}  {CaveheartRules.GetTimeCost(interaction)}m"
+                : InteractionUnavailableText(interaction);
+            PositionHoverTooltip();
+            hudHoverText.gameObject.SetActive(true);
+        }
+
+        private void PositionHoverTooltip()
+        {
+            var canvasRect = hudHoverRect.parent as RectTransform;
+            if (canvasRect == null
+                || !RectTransformUtility.ScreenPointToLocalPointInRectangle(
+                    canvasRect,
+                    Input.mousePosition,
+                    null,
+                    out var localPoint))
+            {
+                return;
+            }
+
+            var canvasBounds = canvasRect.rect;
+            localPoint += new Vector2(18f, -18f);
+            localPoint.x = Mathf.Clamp(localPoint.x, canvasBounds.xMin + 8f, canvasBounds.xMax - hudHoverRect.rect.width - 8f);
+            localPoint.y = Mathf.Clamp(localPoint.y, canvasBounds.yMin + hudHoverRect.rect.height + 8f, canvasBounds.yMax - 8f);
+            hudHoverRect.anchoredPosition = localPoint;
+        }
+
+        private static string InteractionDisplayName(CaveheartInteractionType interaction)
+        {
+            switch (interaction)
+            {
+                case CaveheartInteractionType.Alarm:
+                    return "Urge";
+                case CaveheartInteractionType.GentleTouch:
+                    return "Touch";
+                case CaveheartInteractionType.OfferWater:
+                    return "Offer water";
+                case CaveheartInteractionType.OpenCurtain:
+                    return "Open curtain";
+                case CaveheartInteractionType.Scratch:
+                    return "Scratch";
+                case CaveheartInteractionType.Wait:
+                    return "Observe";
+                default:
+                    return interaction.ToString();
+            }
+        }
+
+        private string InteractionUnavailableText(CaveheartInteractionType interaction)
+        {
+            switch (interaction)
+            {
+                case CaveheartInteractionType.GentleTouch:
+                    return "He does not want more touch.";
+                case CaveheartInteractionType.OfferWater:
+                    return "He has had enough water.";
+                case CaveheartInteractionType.OpenCurtain:
+                    return "The curtain is already open.";
+                case CaveheartInteractionType.Scratch:
+                    return "He tucks his feet away.";
+                default:
+                    return "Not available now.";
+            }
+        }
+
+        private void ApplyInteractionCursor(CaveheartInteractionType? interaction, bool available)
+        {
+            var texture = interaction.HasValue && available
+                ? CursorTexture(interaction.Value)
+                : null;
+            var hotspot = texture == null
+                ? Vector2.zero
+                : new Vector2(texture.width * 0.5f, texture.height * 0.5f);
+            Cursor.SetCursor(texture, hotspot, CursorMode.Auto);
+        }
+
+        private Texture2D CursorTexture(CaveheartInteractionType interaction)
+        {
+            switch (interaction)
+            {
+                case CaveheartInteractionType.Alarm:
+                    return urgeCursor != null ? urgeCursor : urgeCursor = LoadCursorTexture("cursor_rooster_crow_64");
+                case CaveheartInteractionType.GentleTouch:
+                    return touchCursor != null ? touchCursor : touchCursor = LoadCursorTexture("cursor_touch_64");
+                case CaveheartInteractionType.OfferWater:
+                    return waterCursor != null ? waterCursor : waterCursor = LoadCursorTexture("cursor_wooden_cup_64");
+                case CaveheartInteractionType.OpenCurtain:
+                    return windowCursor != null ? windowCursor : windowCursor = LoadCursorTexture("cursor_curtain_open_64");
+                case CaveheartInteractionType.Scratch:
+                    return scratchCursor != null ? scratchCursor : scratchCursor = LoadCursorTexture("cursor_tickled_64");
+                case CaveheartInteractionType.Wait:
+                    return observeCursor != null ? observeCursor : observeCursor = LoadCursorTexture("cursor_observe_eye_64");
+                default:
+                    return null;
+            }
+        }
+
+        private static Texture2D LoadCursorTexture(string assetName)
+        {
+            var sprite = LoadCursorSprite(assetName);
+            return sprite == null ? null : sprite.texture;
+        }
+
+        private static Sprite LoadCursorSprite(string assetName)
+        {
+            return Resources.Load<Sprite>($"Sprites/Caveheart/CursorIcons/Size64/{assetName}");
+        }
+
+        private void OnDisable()
+        {
+            Cursor.SetCursor(null, Vector2.zero, CursorMode.Auto);
         }
 
         private static void RemoveObsoleteUiElement(Transform parent, string objectName)
@@ -429,39 +867,38 @@ namespace MyLittleCaveheart
             }
         }
 
-        private void EnsureBottomActionBar(Transform parent)
+        private static void RemoveActionButtons(Transform parent)
         {
-            const float spacing = 12f;
-            const float buttonWidth = 136f;
-            const float step = buttonWidth + spacing;
-            const float y = 24f;
-            const float startX = -2.5f * step;
-
-            EnsureActionButton(parent, "Action Button - Alarm", "Urge", new Vector2(startX + step * 0f, y), CaveheartInteractionType.Alarm);
-            EnsureActionButton(parent, "Action Button - Touch", "Touch", new Vector2(startX + step * 1f, y), CaveheartInteractionType.GentleTouch);
-            EnsureActionButton(parent, "Action Button - Water", "Water", new Vector2(startX + step * 2f, y), CaveheartInteractionType.OfferWater);
-            EnsureActionButton(parent, "Action Button - Curtain", "Window", new Vector2(startX + step * 3f, y), CaveheartInteractionType.OpenCurtain);
-            EnsureActionButton(parent, "Action Button - Scratch", "Scratch", new Vector2(startX + step * 4f, y), CaveheartInteractionType.Scratch);
-            EnsureActionButton(parent, "Action Button - Wait", "Observe", new Vector2(startX + step * 5f, y), CaveheartInteractionType.Wait);
-
-            RemoveLegacyButton(parent, "Wait Observe Button");
-            RemoveLegacyButton(parent, "Scratch Button");
-            RemoveLegacyButton(parent, "Action Button - Shake Bed");
-            RemoveLegacyButton(parent, "Action Button - Blanket");
-        }
-
-        private static void RemoveLegacyButton(Transform parent, string objectName)
-        {
-            var legacy = parent.Find(objectName);
-            if (legacy != null)
+            var buttonNames = new[]
             {
+                "Action Button - Alarm",
+                "Action Button - Touch",
+                "Action Button - Water",
+                "Action Button - Curtain",
+                "Action Button - Scratch",
+                "Action Button - Wait",
+                "Wait Observe Button",
+                "Scratch Button",
+                "Action Button - Shake Bed",
+                "Action Button - Blanket"
+            };
+
+            for (var i = 0; i < buttonNames.Length; i++)
+            {
+                var button = parent.Find(buttonNames[i]);
+                if (button == null)
+                {
+                    continue;
+                }
+
+                button.gameObject.SetActive(false);
                 if (Application.isPlaying)
                 {
-                    Destroy(legacy.gameObject);
+                    Destroy(button.gameObject);
                 }
                 else
                 {
-                    DestroyImmediate(legacy.gameObject);
+                    DestroyImmediate(button.gameObject);
                 }
             }
         }
@@ -504,7 +941,7 @@ namespace MyLittleCaveheart
 
             textRect.anchorMin = Vector2.zero;
             textRect.anchorMax = Vector2.one;
-            textRect.offsetMin = new Vector2(32f, 24f);
+            textRect.offsetMin = new Vector2(32f, 82f);
             textRect.offsetMax = new Vector2(-32f, -24f);
 
             hudOutcomeText = textObject.GetComponent<Text>();
@@ -519,59 +956,48 @@ namespace MyLittleCaveheart
             hudOutcomeText.color = Color.white;
             hudOutcomeText.horizontalOverflow = HorizontalWrapMode.Wrap;
             hudOutcomeText.verticalOverflow = VerticalWrapMode.Overflow;
+            EnsureRestartButton(panelObject.transform);
             panelObject.SetActive(false);
         }
 
-        private static void EnsureEventSystem()
+        private void EnsureRestartButton(Transform parent)
         {
-            if (FindObjectOfType<EventSystem>() != null)
-            {
-                return;
-            }
+            var buttonTransform = parent.Find("Restart Button");
+            var buttonObject = buttonTransform == null ? new GameObject("Restart Button") : buttonTransform.gameObject;
+            buttonObject.transform.SetParent(parent, false);
 
-            var eventSystem = new GameObject("EventSystem");
-            eventSystem.AddComponent<EventSystem>();
-            eventSystem.AddComponent<StandaloneInputModule>();
-        }
-
-        private void EnsureActionButton(Transform parent, string objectName, string labelText, Vector2 anchoredPosition, CaveheartInteractionType interactionType)
-        {
-            var existing = parent.Find(objectName);
-            var obj = existing == null ? new GameObject(objectName) : existing.gameObject;
-            obj.transform.SetParent(parent, false);
-
-            var rect = obj.GetComponent<RectTransform>();
+            var rect = buttonObject.GetComponent<RectTransform>();
             if (rect == null)
             {
-                rect = obj.AddComponent<RectTransform>();
+                rect = buttonObject.AddComponent<RectTransform>();
             }
 
             rect.anchorMin = new Vector2(0.5f, 0f);
             rect.anchorMax = new Vector2(0.5f, 0f);
             rect.pivot = new Vector2(0.5f, 0f);
-            rect.sizeDelta = new Vector2(136f, 50f);
-            rect.anchoredPosition = anchoredPosition;
+            rect.sizeDelta = new Vector2(160f, 44f);
+            rect.anchoredPosition = new Vector2(0f, 18f);
 
-            var image = obj.GetComponent<Image>();
+            var image = buttonObject.GetComponent<Image>();
             if (image == null)
             {
-                image = obj.AddComponent<Image>();
+                image = buttonObject.AddComponent<Image>();
             }
 
-            image.color = new Color(0.12f, 0.15f, 0.18f, 0.82f);
+            image.color = new Color(0.18f, 0.24f, 0.22f, 0.95f);
 
-            var button = obj.GetComponent<Button>();
-            if (button == null)
+            hudRestartButton = buttonObject.GetComponent<Button>();
+            if (hudRestartButton == null)
             {
-                button = obj.AddComponent<Button>();
+                hudRestartButton = buttonObject.AddComponent<Button>();
             }
 
-            button.onClick.RemoveAllListeners();
-            button.onClick.AddListener(() => Interact(interactionType));
+            hudRestartButton.onClick.RemoveAllListeners();
+            hudRestartButton.onClick.AddListener(ResetMorning);
 
-            var labelTransform = obj.transform.Find("Label");
+            var labelTransform = buttonObject.transform.Find("Label");
             var labelObject = labelTransform == null ? new GameObject("Label") : labelTransform.gameObject;
-            labelObject.transform.SetParent(obj.transform, false);
+            labelObject.transform.SetParent(buttonObject.transform, false);
 
             var labelRect = labelObject.GetComponent<RectTransform>();
             if (labelRect == null)
@@ -591,19 +1017,22 @@ namespace MyLittleCaveheart
             }
 
             label.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-            label.text = labelText;
+            label.text = "Restart";
             label.fontSize = 20;
             label.alignment = TextAnchor.MiddleCenter;
             label.color = Color.white;
+        }
 
-            var feedback = obj.GetComponent<CaveheartActionButtonFeedback>();
-            if (feedback == null)
+        private static void EnsureEventSystem()
+        {
+            if (FindObjectOfType<EventSystem>() != null)
             {
-                feedback = obj.AddComponent<CaveheartActionButtonFeedback>();
+                return;
             }
 
-            feedback.Configure(image, label, interactionType);
-            obj.SetActive(true);
+            var eventSystem = new GameObject("EventSystem");
+            eventSystem.AddComponent<EventSystem>();
+            eventSystem.AddComponent<StandaloneInputModule>();
         }
 
         private void FindOrCreateSignalBars(Transform parent)
@@ -709,6 +1138,12 @@ namespace MyLittleCaveheart
                 rect.anchorMax = new Vector2(0f, 1f);
                 rect.pivot = new Vector2(0f, 1f);
             }
+            else if (anchor == TextAnchor.UpperCenter)
+            {
+                rect.anchorMin = new Vector2(0.5f, 1f);
+                rect.anchorMax = new Vector2(0.5f, 1f);
+                rect.pivot = new Vector2(0.5f, 1f);
+            }
             else
             {
                 rect.anchorMin = new Vector2(1f, 1f);
@@ -728,6 +1163,7 @@ namespace MyLittleCaveheart
             text.color = Color.white;
             text.horizontalOverflow = HorizontalWrapMode.Wrap;
             text.verticalOverflow = VerticalWrapMode.Overflow;
+            text.raycastTarget = false;
 
             var shadow = obj.GetComponent<Shadow>();
             if (shadow == null)
@@ -791,8 +1227,8 @@ namespace MyLittleCaveheart
             }
 
             hudReactionText.text = string.IsNullOrEmpty(result.message)
-                ? result.observedReaction
-                : $"{result.message}\n{result.observedReaction}";
+                ? CombineFeedbackLines(result.observedReaction, BuildActionImpactText(result))
+                : CombineFeedbackLines(result.message, result.observedReaction, BuildActionImpactText(result));
         }
 
         private void UpdateOutcomeUi()
@@ -804,7 +1240,13 @@ namespace MyLittleCaveheart
 
             var showSittingUp = currentState == CaveheartState.SittingUp && !hasMorningClosed;
             var showMorningClosed = hasMorningClosed;
-            hudOutcomePanel.gameObject.SetActive(showSittingUp || showMorningClosed);
+            var showOutcome = showSittingUp || showMorningClosed;
+            hudOutcomePanel.gameObject.SetActive(showOutcome);
+
+            if (hudRestartButton != null)
+            {
+                hudRestartButton.gameObject.SetActive(showOutcome);
+            }
 
             if (showSittingUp)
             {
@@ -813,24 +1255,25 @@ namespace MyLittleCaveheart
                 {
                     hudOutcomePanel.color = new Color(0.06f, 0.11f, 0.08f, 0.9f);
                     hudOutcomeText.text =
-                        "A soft morning\n\n" +
-                        "\"I can get up this way.\"\n\n" +
-                        "He feels safe.";
+                        "A warm morning\n\n" +
+                        "\"Stay close. I can get up.\"\n\n" +
+                        "He reaches for you before he stands.";
                 }
                 else if (outcome == MorningOutcome.Good)
                 {
                     hudOutcomePanel.color = new Color(0.08f, 0.1f, 0.08f, 0.9f);
                     hudOutcomeText.text =
-                        "He sits up\n\n" +
-                        "\"I can start slowly.\"\n\n" +
-                        "He is willing to move.";
+                        "A good morning\n\n" +
+                        "\"I can start from here.\"\n\n" +
+                        "He sits up beside you.";
                 }
                 else
                 {
                     hudOutcomePanel.color = new Color(0.11f, 0.09f, 0.07f, 0.9f);
                     hudOutcomeText.text =
                         "He gets up, tense\n\n" +
-                        "He is awake, but still tense.";
+                        "He is awake, but the morning felt pushed.\n\n" +
+                        BuildTenseOutcomeHint();
                 }
             }
             else if (showMorningClosed)
@@ -838,8 +1281,193 @@ namespace MyLittleCaveheart
                 hudOutcomePanel.color = new Color(0.1f, 0.08f, 0.08f, 0.9f);
                 hudOutcomeText.text =
                     "Today stops here\n\n" +
-                    "He is not ready to move yet.";
+                    "He is not ready to move yet.\n\n" +
+                    BuildMorningClosedHint();
             }
+        }
+
+        private static string CombineFeedbackLines(params string[] lines)
+        {
+            var text = string.Empty;
+            for (var i = 0; i < lines.Length; i++)
+            {
+                if (string.IsNullOrEmpty(lines[i]))
+                {
+                    continue;
+                }
+
+                text = string.IsNullOrEmpty(text) ? lines[i] : text + "\n" + lines[i];
+            }
+
+            return text;
+        }
+
+        private static string BuildActionImpactText(CaveheartInteractionResult result)
+        {
+            var awakeDelta = result.after.awake - result.before.awake;
+            var trustDelta = result.after.trust - result.before.trust;
+            var stressDelta = result.after.stress - result.before.stress;
+
+            if (awakeDelta == 0 && trustDelta == 0 && stressDelta == 0)
+            {
+                return result.accepted
+                    ? "It does not change him much."
+                    : "He says no. Nothing really reaches him.";
+            }
+
+            var impact = string.Empty;
+            AddImpactPart(ref impact, AwakeImpactText(awakeDelta));
+            AddImpactPart(ref impact, TrustImpactText(trustDelta));
+            AddImpactPart(ref impact, StressImpactText(stressDelta));
+
+            if (!result.accepted && !string.IsNullOrEmpty(impact))
+            {
+                return "He refuses, and " + LowerFirst(impact);
+            }
+
+            return impact;
+        }
+
+        private static void AddImpactPart(ref string impact, string part)
+        {
+            if (string.IsNullOrEmpty(part))
+            {
+                return;
+            }
+
+            impact = string.IsNullOrEmpty(impact) ? part : impact + " " + part;
+        }
+
+        private static string AwakeImpactText(int delta)
+        {
+            if (delta >= 2)
+            {
+                return "He wakes up a lot.";
+            }
+
+            if (delta > 0)
+            {
+                return "He wakes a little.";
+            }
+
+            return string.Empty;
+        }
+
+        private static string TrustImpactText(int delta)
+        {
+            if (delta >= 2)
+            {
+                return "He really starts to trust you.";
+            }
+
+            if (delta > 0)
+            {
+                return "He lets you in a little.";
+            }
+
+            if (delta < 0)
+            {
+                return "He pulls away from you.";
+            }
+
+            return string.Empty;
+        }
+
+        private static string StressImpactText(int delta)
+        {
+            if (delta >= 2)
+            {
+                return "He tenses up hard.";
+            }
+
+            if (delta > 0)
+            {
+                return "He gets tense.";
+            }
+
+            if (delta <= -2)
+            {
+                return "He relaxes a lot.";
+            }
+
+            if (delta < 0)
+            {
+                return "He relaxes a little.";
+            }
+
+            return string.Empty;
+        }
+
+        private static string LowerFirst(string text)
+        {
+            if (string.IsNullOrEmpty(text))
+            {
+                return text;
+            }
+
+            return char.ToLowerInvariant(text[0]) + text.Substring(1);
+        }
+
+        private string BuildMorningClosedHint()
+        {
+            var hint = string.Empty;
+            if (stats.awake < CaveheartRules.SitUpAwake)
+            {
+                AddOutcomeReason(ref hint, "he was still too asleep");
+            }
+
+            if (stats.trust < CaveheartRules.SitUpTrust)
+            {
+                AddOutcomeReason(ref hint, "he did not feel safe enough");
+            }
+
+            if (stats.stress > CaveheartRules.SitUpMaxStress)
+            {
+                AddOutcomeReason(ref hint, "his body was still too tense");
+            }
+
+            return string.IsNullOrEmpty(hint)
+                ? "The morning ran out."
+                : "Mostly, " + hint + ".";
+        }
+
+        private string BuildTenseOutcomeHint()
+        {
+            var hint = string.Empty;
+            if (forcefulUseCount >= 3)
+            {
+                AddOutcomeReason(ref hint, "too many forceful pushes stayed in his body");
+            }
+
+            if (rejectedActionCount > 0)
+            {
+                AddOutcomeReason(ref hint, "some of his signals were missed");
+            }
+
+            if (stats.trust < CaveheartRules.SitUpTrust)
+            {
+                AddOutcomeReason(ref hint, "he got up before he fully trusted the morning");
+            }
+
+            if (stats.stress > CaveheartRules.SitUpMaxStress)
+            {
+                AddOutcomeReason(ref hint, "his body was still too tense");
+            }
+
+            return string.IsNullOrEmpty(hint)
+                ? "He got up, but it was hard on him."
+                : "Mostly, " + hint + ".";
+        }
+
+        private static void AddOutcomeReason(ref string hint, string reason)
+        {
+            if (string.IsNullOrEmpty(hint))
+            {
+                hint = reason;
+                return;
+            }
+
+            hint += ", and " + reason;
         }
 
         private MorningOutcome GetMorningOutcome()
@@ -854,8 +1482,16 @@ namespace MyLittleCaveheart
                 return MorningOutcome.Bad;
             }
 
-            var cleanVeryGood = forcefulUseCount == 0 && stats.trust >= 5 && stats.stress <= 3 && usedMorningMinutes <= 12;
-            var repairedVeryGood = forcefulUseCount == 1 && stats.trust >= 6 && stats.stress <= 2 && usedMorningMinutes <= 10;
+            var cleanVeryGood = forcefulUseCount == 0
+                && rejectedActionCount == 0
+                && stats.trust >= 5
+                && stats.stress <= 3
+                && usedMorningMinutes <= 12;
+            var repairedVeryGood = forcefulUseCount == 1
+                && rejectedActionCount == 0
+                && stats.trust >= 5
+                && stats.stress <= 2
+                && usedMorningMinutes <= 12;
             if (cleanVeryGood || repairedVeryGood)
             {
                 return MorningOutcome.VeryGood;
@@ -903,6 +1539,7 @@ namespace MyLittleCaveheart
                 $"accepted={result.accepted} | " +
                 $"state {previousState} -> {result.state} | " +
                 $"time {usedMorningMinutes}/{morningTimeLimitMinutes}m | " +
+                $"rejected {rejectedActionCount} | " +
                 $"awake {result.before.awake}->{result.after.awake}, " +
                 $"trust {result.before.trust}->{result.after.trust}, " +
                 $"stress {result.before.stress}->{result.after.stress} | " +
