@@ -5,11 +5,23 @@ namespace MyLittleCaveheart
 {
     public sealed class CaveheartSpriteAnimator : MonoBehaviour
     {
+        [Header("Renderer")]
         [SerializeField] private SpriteRenderer targetRenderer;
         [SerializeField] private int sortingOrder = 80;
         [SerializeField] private bool applySortingOrder = true;
+
+        [Header("Animation")]
         [SerializeField] private bool animateFrames;
         [SerializeField] private float framesPerSecond = 6f;
+
+        [Header("State Images")]
+        [SerializeField] private Sprite[] sleepingFrames;
+        [SerializeField] private Sprite[] startledFrames;
+        [SerializeField] private Sprite[] resistingFrames;
+        [SerializeField] private Sprite[] settledFrames;
+        [SerializeField] private Sprite[] sittingUpFrames;
+
+        [Header("Fallback Resource Loading")]
         [SerializeField] private string resourceRoot = "Sprites/Caveheart";
         [SerializeField] private int frameCount = 4;
         [SerializeField] private string sleepingClipName = "sleeping";
@@ -53,11 +65,11 @@ namespace MyLittleCaveheart
 
         public void LoadClips()
         {
-            clips[CaveheartState.Sleeping] = LoadClip(sleepingClipName);
-            clips[CaveheartState.Startled] = LoadClip(startledClipName);
-            clips[CaveheartState.Resisting] = LoadClip(resistingClipName);
-            clips[CaveheartState.Settled] = LoadClip(settledClipName);
-            clips[CaveheartState.SittingUp] = LoadClip(sittingUpClipName);
+            clips[CaveheartState.Sleeping] = ResolveClip(sleepingFrames, sleepingClipName);
+            clips[CaveheartState.Startled] = ResolveClip(startledFrames, startledClipName);
+            clips[CaveheartState.Resisting] = ResolveClip(resistingFrames, resistingClipName);
+            clips[CaveheartState.Settled] = ResolveClip(settledFrames, settledClipName);
+            clips[CaveheartState.SittingUp] = ResolveClip(sittingUpFrames, sittingUpClipName);
         }
 
         public void Play(CaveheartState state)
@@ -119,6 +131,28 @@ namespace MyLittleCaveheart
             }
 
             return frames.ToArray();
+        }
+
+        private Sprite[] ResolveClip(Sprite[] configuredFrames, string fallbackClipName)
+        {
+            if (configuredFrames != null && configuredFrames.Length > 0)
+            {
+                var validFrames = new List<Sprite>(configuredFrames.Length);
+                for (var i = 0; i < configuredFrames.Length; i++)
+                {
+                    if (configuredFrames[i] != null)
+                    {
+                        validFrames.Add(configuredFrames[i]);
+                    }
+                }
+
+                if (validFrames.Count > 0)
+                {
+                    return validFrames.ToArray();
+                }
+            }
+
+            return LoadClip(fallbackClipName);
         }
 
         private void ApplyRendererSettings()

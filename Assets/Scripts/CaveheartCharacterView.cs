@@ -31,13 +31,13 @@ namespace MyLittleCaveheart
 
         public void BindExistingScene()
         {
-            characterRoot = FindTransform("Little Caveheart Character");
-            body = FindRenderer("Body");
-            blanket = FindRenderer("Blanket");
-            face = FindRenderer("Face Mood Mark");
-            leftArm = FindRenderer("Left Arm");
-            rightArm = FindRenderer("Right Arm");
-            tear = FindRenderer("Tear Marker");
+            characterRoot = characterRoot == null ? FindTransform("Little Caveheart Character") : characterRoot;
+            body = body == null ? FindRenderer("Body") : body;
+            blanket = blanket == null ? FindRenderer("Blanket") : blanket;
+            face = face == null ? FindRenderer("Face Mood Mark") : face;
+            leftArm = leftArm == null ? FindRenderer("Left Arm") : leftArm;
+            rightArm = rightArm == null ? FindRenderer("Right Arm") : rightArm;
+            tear = tear == null ? FindRenderer("Tear Marker") : tear;
 
             squareSprite = body != null ? body.sprite : CreateSquareSprite();
             EnsureExpressionParts();
@@ -150,6 +150,7 @@ namespace MyLittleCaveheart
                 speechText.characterSize = 0.22f;
                 speechText.fontSize = 48;
                 speechText.color = Color.white;
+                CaveheartTypography.ApplyTo(speechText);
                 speech.GetComponent<MeshRenderer>().sortingOrder = 60;
             }
         }

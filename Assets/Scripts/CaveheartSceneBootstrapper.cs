@@ -8,7 +8,6 @@ namespace MyLittleCaveheart
     {
         [SerializeField] private bool buildOnEnable = true;
         [SerializeField] private bool allowRuntimeBuild;
-        [SerializeField] private bool rebuildEveryPlay = true;
         [SerializeField] private Vector3 animatedSpritePosition = new Vector3(0f, -0.35f, -0.55f);
         [SerializeField] private Vector3 animatedSpriteScale = new Vector3(2.2f, 2.2f, 1f);
         [SerializeField] private int animatedSpriteSortingOrder = 80;
@@ -24,7 +23,7 @@ namespace MyLittleCaveheart
 
             if (Application.isPlaying)
             {
-                if (allowRuntimeBuild && (rebuildEveryPlay || transform.childCount == 0))
+                if (allowRuntimeBuild && transform.childCount == 0)
                 {
                     Build();
                 }
@@ -173,6 +172,7 @@ namespace MyLittleCaveheart
             mesh.characterSize = 0.28f;
             mesh.fontSize = 42;
             mesh.color = Color.white;
+            CaveheartTypography.ApplyTo(mesh);
             label.GetComponent<MeshRenderer>().sortingOrder = 30;
         }
 
@@ -219,7 +219,7 @@ namespace MyLittleCaveheart
 
             var uiText = obj.AddComponent<Text>();
             uiText.text = text;
-            uiText.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            CaveheartTypography.ApplyTo(uiText);
             uiText.fontSize = fontSize;
             uiText.alignment = anchor;
             uiText.color = Color.white;

@@ -45,10 +45,12 @@ Material:
     - _PaperGrain: 0
     - _PaperOverlayStrength: 0.7
     - _Posterize: 0
+    - _Saturation: 1
     - _SecondaryStrokeStrength: 0.216
     - _ShadowChromaSoftness: 0.286
     - _ShadowChromaThreshold: 0.366
     - _ShadowEdgeSuppression: 0.78
+    - _ToneTintStrength: 0
     - _XDogBlend: 0.833
     - _XDogInteriorSuppression: 0.9
     - _XDogPhi: 12
@@ -60,4 +62,5 @@ Material:
     m_Colors:
     - _InkColor: {r: 0.13999993, g: 0.084999956, b: 0.054999955, a: 0.5529412}
     - _PaperOverlayTint: {r: 1, g: 0.985, b: 0.965, a: 1}
+    - _ToneTint: {r: 1, g: 1, b: 1, a: 1}
   m_BuildTextureStacks: []

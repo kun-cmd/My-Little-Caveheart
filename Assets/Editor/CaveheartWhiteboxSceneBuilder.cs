@@ -162,6 +162,7 @@ namespace MyLittleCaveheart.EditorTools
             mesh.characterSize = size;
             mesh.fontSize = 42;
             mesh.color = Color.white;
+            CaveheartTypography.ApplyTo(mesh);
             label.GetComponent<MeshRenderer>().sortingOrder = 30;
         }
 
@@ -211,7 +212,7 @@ namespace MyLittleCaveheart.EditorTools
 
             var uiText = obj.AddComponent<Text>();
             uiText.text = text;
-            uiText.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            CaveheartTypography.ApplyTo(uiText);
             uiText.fontSize = fontSize;
             uiText.alignment = anchor;
             uiText.color = Color.white;
