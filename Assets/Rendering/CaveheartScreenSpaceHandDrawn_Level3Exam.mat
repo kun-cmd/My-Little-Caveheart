@@ -1,0 +1,66 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!21 &2100000
+Material:
+  serializedVersion: 8
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: CaveheartScreenSpaceHandDrawn_Level3Exam
+  m_Shader: {fileID: 4800000, guid: a8cbe4b51b534deabfbbe5c9e00f77d4, type: 3}
+  m_Parent: {fileID: 0}
+  m_ModifiedSerializedProperties: 0
+  m_ValidKeywords: []
+  m_InvalidKeywords: []
+  m_LightmapFlags: 4
+  m_EnableInstancingVariants: 0
+  m_DoubleSidedGI: 0
+  m_CustomRenderQueue: -1
+  stringTagMap: {}
+  disabledShaderPasses: []
+  m_LockedProperties: 
+  m_SavedProperties:
+    serializedVersion: 3
+    m_TexEnvs:
+    - _PaperOverlayTex:
+        m_Texture: {fileID: 2800000, guid: d53c95d5ad7cccf43ab07ff6997a8a3a, type: 3}
+        m_Scale: {x: 0.5, y: 0.5}
+        m_Offset: {x: 0, y: 0}
+    m_Ints: []
+    m_Floats:
+    - _BrokenLineStrength: 0
+    - _ColorEdgeStrength: 0.249
+    - _EdgeStrength: 0.78
+    - _EdgeThreshold: 0.051
+    - _FineDetailSupportSoftness: 0.16
+    - _FineDetailSupportThreshold: 0.055
+    - _FineDetailSupportWidth: 2.6
+    - _FineDetailSuppression: 0.68
+    - _JitterFrequency: 5
+    - _JitterStrength: 3.23
+    - _LineSoftness: 0.2
+    - _LineWidth: 2.2
+    - _NoiseScale: 104.4
+    - _PaperGrain: 0
+    - _PaperOverlayStrength: 0.7
+    - _Posterize: 0
+    - _Saturation: 0.782
+    - _SecondaryStrokeStrength: 0.216
+    - _ShadowChromaSoftness: 0.286
+    - _ShadowChromaThreshold: 0.366
+    - _ShadowEdgeSuppression: 0.78
+    - _ToneTintStrength: 0.38
+    - _XDogBlend: 0.833
+    - _XDogInteriorSuppression: 0.9
+    - _XDogPhi: 12
+    - _XDogRadius: 2.05
+    - _XDogStrength: 2.05
+    - _XDogSupportSoftness: 0.12
+    - _XDogSupportThreshold: 0.035
+    - _XDogThreshold: 0.075
+    m_Colors:
+    - _InkColor: {r: 0.13999993, g: 0.084999956, b: 0.054999955, a: 0.5529412}
+    - _PaperOverlayTint: {r: 1, g: 0.985, b: 0.965, a: 1}
+    - _ToneTint: {r: 0.648748, g: 0.86306334, b: 0.8930817, a: 0.60784316}
+  m_BuildTextureStacks: []

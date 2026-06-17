@@ -6,15 +6,18 @@ namespace MyLittleCaveheart
     {
         private const string MusicResourcePath = "Audio/Caveheart/bgm_pale_sunrise";
 
+        [Header("Music")]
         [SerializeField] private AudioSource audioSource;
+        [SerializeField] private AudioClip musicClip;
         [SerializeField, Range(0f, 1f)] private float volume = 0.28f;
         private Coroutine playWhenReadyRoutine;
 
-        public static CaveheartBackgroundMusic Ensure()
+        public static CaveheartBackgroundMusic Ensure(AudioClip preferredClip = null, float preferredVolume = 0.28f)
         {
             var existing = FindObjectOfType<CaveheartBackgroundMusic>();
             if (existing != null)
             {
+                existing.ApplyPreferences(preferredClip, preferredVolume);
                 existing.Play();
                 return existing;
             }
@@ -22,6 +25,7 @@ namespace MyLittleCaveheart
             var obj = new GameObject("Caveheart Background Music");
             DontDestroyOnLoad(obj);
             var music = obj.AddComponent<CaveheartBackgroundMusic>();
+            music.ApplyPreferences(preferredClip, preferredVolume);
             music.Play();
             return music;
         }
@@ -45,9 +49,14 @@ namespace MyLittleCaveheart
             audioSource.spatialBlend = 0f;
             audioSource.volume = volume;
 
+            if (musicClip == null)
+            {
+                musicClip = Resources.Load<AudioClip>(MusicResourcePath);
+            }
+
             if (audioSource.clip == null)
             {
-                audioSource.clip = Resources.Load<AudioClip>(MusicResourcePath);
+                audioSource.clip = musicClip;
             }
 
             if (audioSource.clip == null)
@@ -67,6 +76,24 @@ namespace MyLittleCaveheart
             }
 
             playWhenReadyRoutine = StartCoroutine(PlayWhenReady());
+        }
+
+        private void ApplyPreferences(AudioClip preferredClip, float preferredVolume)
+        {
+            if (preferredClip != null)
+            {
+                musicClip = preferredClip;
+            }
+
+            volume = Mathf.Clamp01(preferredVolume);
+            if (audioSource != null)
+            {
+                audioSource.volume = volume;
+                if (musicClip != null && audioSource.clip != musicClip)
+                {
+                    audioSource.clip = musicClip;
+                }
+            }
         }
 
         private System.Collections.IEnumerator PlayWhenReady()

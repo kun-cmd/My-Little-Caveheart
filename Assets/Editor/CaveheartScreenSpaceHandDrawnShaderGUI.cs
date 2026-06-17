@@ -34,6 +34,9 @@ public sealed class CaveheartScreenSpaceHandDrawnShaderGUI : ShaderGUI
     private MaterialProperty paperOverlayStrength;
     private MaterialProperty paperGrain;
     private MaterialProperty posterize;
+    private MaterialProperty toneTint;
+    private MaterialProperty toneTintStrength;
+    private MaterialProperty saturation;
 
     public override void OnGUI(MaterialEditor materialEditor, MaterialProperty[] properties)
     {
@@ -90,6 +93,12 @@ public sealed class CaveheartScreenSpaceHandDrawnShaderGUI : ShaderGUI
         materialEditor.ShaderProperty(brokenLineStrength, MakeLabel("Broken Line", "Randomly knocks out parts of the stroke to simulate dry ink or pencil skips."));
         materialEditor.ShaderProperty(paperGrain, MakeLabel("Micro Grain", "Tiny procedural grain under the paper image. Leave very low if the paper texture already reads well."));
         materialEditor.ShaderProperty(posterize, MakeLabel("Posterize", "Reduces color steps for a flatter illustrated feel."));
+
+        EditorGUILayout.Space();
+        DrawGroupHeader("Runtime Tone", "Full-screen color grade knobs. Level scripts can animate these while leaving the ink and paper parameters hand-tuned.");
+        materialEditor.ShaderProperty(toneTint, MakeLabel("Tone Tint", "Color multiplied into the final screen image when Tone Tint Strength is above zero."));
+        materialEditor.ShaderProperty(toneTintStrength, MakeLabel("Tone Tint Strength", "How much the final image is pulled toward the tint color."));
+        materialEditor.ShaderProperty(saturation, MakeLabel("Saturation", "Overall color saturation after ink and paper have been applied."));
     }
 
     private void Cache(MaterialProperty[] properties)
@@ -125,6 +134,9 @@ public sealed class CaveheartScreenSpaceHandDrawnShaderGUI : ShaderGUI
         paperOverlayStrength = FindProperty("_PaperOverlayStrength", properties);
         paperGrain = FindProperty("_PaperGrain", properties);
         posterize = FindProperty("_Posterize", properties);
+        toneTint = FindProperty("_ToneTint", properties);
+        toneTintStrength = FindProperty("_ToneTintStrength", properties);
+        saturation = FindProperty("_Saturation", properties);
     }
 
     private static void DrawGroupHeader(string title, string description)

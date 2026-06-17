@@ -33,6 +33,9 @@ Shader "Hidden/Caveheart/Screen Space Hand Drawn"
         _PaperOverlayStrength ("Paper Overlay Strength", Range(0, 1)) = 0.18
         _PaperGrain ("Paper Grain", Range(0, 1)) = 0
         _Posterize ("Posterize", Range(0, 1)) = 0
+        _ToneTint ("Tone Tint", Color) = (1, 1, 1, 1)
+        _ToneTintStrength ("Tone Tint Strength", Range(0, 1)) = 0
+        _Saturation ("Saturation", Range(0, 2)) = 1
     }
 
     SubShader
@@ -89,6 +92,9 @@ Shader "Hidden/Caveheart/Screen Space Hand Drawn"
             float _PaperOverlayStrength;
             float _PaperGrain;
             float _Posterize;
+            float4 _ToneTint;
+            float _ToneTintStrength;
+            float _Saturation;
 
             float Hash21(float2 p)
             {
@@ -228,6 +234,14 @@ Shader "Hidden/Caveheart/Screen Space Hand Drawn"
                 return lerp(color, stepped, _Posterize);
             }
 
+            float3 ApplyToneGrade(float3 color)
+            {
+                float luma = Luma(color);
+                float3 saturated = lerp(float3(luma, luma, luma), color, _Saturation);
+                float3 tinted = saturated * _ToneTint.rgb;
+                return lerp(saturated, tinted, _ToneTintStrength);
+            }
+
             float4 SamplePaperOverlay(float2 uv)
             {
                 float2 paperUv = TRANSFORM_TEX(uv, _PaperOverlayTex);
@@ -263,7 +277,8 @@ Shader "Hidden/Caveheart/Screen Space Hand Drawn"
                 toned *= paperOverlayTinted;
 
                 float3 inked = lerp(toned, _InkColor.rgb, saturate(inkLine * _InkColor.a));
-                return half4(saturate(inked), 1.0);
+                float3 graded = ApplyToneGrade(inked);
+                return half4(saturate(graded), 1.0);
             }
             ENDHLSL
         }

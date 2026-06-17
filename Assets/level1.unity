@@ -173,7 +173,7 @@ TextMesh:
   m_FontSize: 42
   m_FontStyle: 0
   m_RichText: 1
-  m_Font: {fileID: 0}
+  m_Font: {fileID: 12800000, guid: 034860d629ef4352b4e27f4939a9bd47, type: 3}
   m_Color:
     serializedVersion: 2
     rgba: 4294967295
@@ -270,7 +270,7 @@ TextMesh:
   m_FontSize: 42
   m_FontStyle: 0
   m_RichText: 1
-  m_Font: {fileID: 0}
+  m_Font: {fileID: 12800000, guid: 034860d629ef4352b4e27f4939a9bd47, type: 3}
   m_Color:
     serializedVersion: 2
     rgba: 4294967295
@@ -466,7 +466,7 @@ BoxCollider2D:
   m_IsTrigger: 0
   m_UsedByEffector: 0
   m_UsedByComposite: 0
-  m_Offset: {x: 0, y: 0}
+  m_Offset: {x: -0.13449907, y: -0.22652459}
   m_SpriteTilingProperty:
     border: {x: 0, y: 0, z: 0, w: 0}
     pivot: {x: 0.5, y: 0.5}
@@ -477,7 +477,7 @@ BoxCollider2D:
     adaptiveTiling: 0
   m_AutoTiling: 0
   serializedVersion: 2
-  m_Size: {x: 1.8, y: 2.2}
+  m_Size: {x: 2.0689983, y: 2.6530492}
   m_EdgeRadius: 0
 --- !u!212 &310369682
 SpriteRenderer:
@@ -598,7 +598,7 @@ TextMesh:
   m_FontSize: 42
   m_FontStyle: 0
   m_RichText: 1
-  m_Font: {fileID: 0}
+  m_Font: {fileID: 12800000, guid: 034860d629ef4352b4e27f4939a9bd47, type: 3}
   m_Color:
     serializedVersion: 2
     rgba: 4294967295
@@ -1087,7 +1087,7 @@ SpriteRenderer:
   m_SortingLayerID: 0
   m_SortingLayer: 0
   m_SortingOrder: 0
-  m_Sprite: {fileID: 21300000, guid: 359fb514adc03b141882c134f85dfe2b, type: 3}
+  m_Sprite: {fileID: 21300000, guid: 0e6344b2d11ffec41a38119604e76647, type: 3}
   m_Color: {r: 1, g: 1, b: 1, a: 1}
   m_FlipX: 0
   m_FlipY: 0
@@ -1164,7 +1164,7 @@ TextMesh:
   m_FontSize: 42
   m_FontStyle: 0
   m_RichText: 1
-  m_Font: {fileID: 0}
+  m_Font: {fileID: 12800000, guid: 034860d629ef4352b4e27f4939a9bd47, type: 3}
   m_Color:
     serializedVersion: 2
     rgba: 4294967295
@@ -1276,7 +1276,7 @@ BoxCollider2D:
   m_IsTrigger: 0
   m_UsedByEffector: 0
   m_UsedByComposite: 0
-  m_Offset: {x: 0, y: 0}
+  m_Offset: {x: 0.19820881, y: -0.38226026}
   m_SpriteTilingProperty:
     border: {x: 0, y: 0, z: 0, w: 0}
     pivot: {x: 0.5, y: 0.5}
@@ -1287,7 +1287,7 @@ BoxCollider2D:
     adaptiveTiling: 0
   m_AutoTiling: 0
   serializedVersion: 2
-  m_Size: {x: 2.4, y: 1.5}
+  m_Size: {x: 2.0035825, y: 1.443369}
   m_EdgeRadius: 0
 --- !u!212 &1252593530
 SpriteRenderer:
@@ -1423,7 +1423,7 @@ BoxCollider2D:
   m_IsTrigger: 0
   m_UsedByEffector: 0
   m_UsedByComposite: 0
-  m_Offset: {x: 0, y: 0}
+  m_Offset: {x: 1.0972278, y: 0.20528722}
   m_SpriteTilingProperty:
     border: {x: 0, y: 0, z: 0, w: 0}
     pivot: {x: 0.5, y: 0.5}
@@ -1434,7 +1434,7 @@ BoxCollider2D:
     adaptiveTiling: 0
   m_AutoTiling: 0
   serializedVersion: 2
-  m_Size: {x: 2.5, y: 1.55}
+  m_Size: {x: 3.6467834, y: 2.5835185}
   m_EdgeRadius: 0
 --- !u!212 &1518523744
 SpriteRenderer:
@@ -1552,8 +1552,45 @@ MonoBehaviour:
   windowZone: {fileID: 815578379}
   observeZone: {fileID: 3000000013}
   curtainBackgroundRenderer: {fileID: 1015470608}
-  closedCurtainBackground: {fileID: 21300000, guid: 359fb514adc03b141882c134f85dfe2b, type: 3}
-  openCurtainBackground: {fileID: 21300000, guid: 37fdc0de12ff9c54b9650059a93cc52c, type: 3}
+  closedCurtainBackground: {fileID: 21300000, guid: 0e6344b2d11ffec41a38119604e76647, type: 3}
+  openCurtainBackground: {fileID: 21300000, guid: 22c07ef1b00cec147afef24be363dcf1, type: 3}
+  resetCurtainOnMorning: 1
+  urgeCursor: {fileID: 2800000, guid: b237e9d238bb60e418056d7c27de8f8b, type: 3}
+  touchCursor: {fileID: 2800000, guid: 1224a2d064d44654ea7c4d6a706fbca6, type: 3}
+  waterCursor: {fileID: 2800000, guid: ada964c907d4c594cb7bccbcf83b6661, type: 3}
+  windowCursor: {fileID: 2800000, guid: ac9075106e72eb44ca461ff626670c86, type: 3}
+  scratchCursor: {fileID: 2800000, guid: 5df20513b08bbe64181e887522dcde01, type: 3}
+  observeCursor: {fileID: 2800000, guid: 9f0aaf71c9466e24b91a4c5e098f4309, type: 3}
+  backgroundMusicClip: {fileID: 8300000, guid: 6827ae47d8f1d6f40ab5febb6242997e, type: 3}
+  backgroundMusicVolume: 0.28
+  outcomePanelSprite: {fileID: 0}
+  restartButtonSprite: {fileID: 0}
+  signalBarTrackSprite: {fileID: 0}
+  reactionTextPosition: {x: 0, y: -72}
+  reactionTextSize: {x: 760, y: 190}
+  timeTextPosition: {x: -24, y: -24}
+  timeTextSize: {x: 300, y: 52}
+  debugValuesPosition: {x: -24, y: -72}
+  debugValuesSize: {x: 260, y: 128}
+  awakeBarPosition: {x: -24, y: -112}
+  trustBarPosition: {x: -24, y: -158}
+  stressBarPosition: {x: -24, y: -204}
+  hoverLabelSize: {x: 260, y: 58}
+  hoverLabelOffset: {x: 18, y: -18}
+  hoverLabelDelay: 0.35
+  holdToObserve: 1
+  observeHoldDuration: 1
+  observeHoldReturnSpeed: 3.5
+  observeHoldRingRadius: 20
+  observeHoldRingWidth: 8
+  observeHoldRingOffset: {x: 0, y: 0}
+  observeHoldIdleRingColor: {r: 0, g: 0, b: 0, a: 0.34}
+  observeHoldWarmStartColor: {r: 1, g: 0.48, b: 0.14, a: 0.88}
+  observeHoldWarmEndColor: {r: 1, g: 0.76, b: 0.32, a: 0.96}
+  outcomePanelPosition: {x: 0, y: 0}
+  outcomePanelSize: {x: 800, y: 260}
+  restartButtonPosition: {x: 0, y: 18}
+  restartButtonSize: {x: 160, y: 44}
 --- !u!114 &1750618383
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1566,8 +1603,22 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 4868a0e3cdb90534ba032178d27c1a34, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  controller: {fileID: 0}
-  audioSource: {fileID: 0}
+  controller: {fileID: 1750618382}
+  audioSource: {fileID: 1750618384}
+  urgeClip: {fileID: 8300000, guid: e79082b57d9704648b94fa2ad711f9fa, type: 3}
+  touchClip: {fileID: 8300000, guid: fc859b94c05aec948a1a62e46109ffaa, type: 3}
+  waterClip: {fileID: 8300000, guid: 37b43628783da024eb603be98f307c8b, type: 3}
+  windowClip: {fileID: 8300000, guid: 95f9caf290ab76746942491e2795eaa8, type: 3}
+  scratchClip: {fileID: 8300000, guid: fc859b94c05aec948a1a62e46109ffaa, type: 3}
+  observeClip: {fileID: 8300000, guid: 26669a9209486d84b95c151a8ca5c349, type: 3}
+  positiveTwoToneClip: {fileID: 8300000, guid: 8b0d26deff7b68043974ad446d413d8e, type: 3}
+  positiveThreeToneClip: {fileID: 8300000, guid: d8da32be74133074382456919f87ec64, type: 3}
+  negativeThreeToneClip: {fileID: 8300000, guid: ab360fee1b251d14aac9e0fe8c4ff54f, type: 3}
+  rejectTwoClip: {fileID: 8300000, guid: 387eb395290c0c448a4acb4a79ecff98, type: 3}
+  rejectThreeClip: {fileID: 8300000, guid: 64c3df95d1c33444fad139ff3c481783, type: 3}
+  sourceVolume: 0.9
+  actionVolume: 0.8
+  feedbackVolume: 0.72
 --- !u!82 &1750618384
 AudioSource:
   m_ObjectHideFlags: 0
@@ -1862,6 +1913,31 @@ MonoBehaviour:
   applySortingOrder: 1
   animateFrames: 0
   framesPerSecond: 6
+  sleepingFrames:
+  - {fileID: 21300000, guid: a329150762023614da83daae949cd6fd, type: 3}
+  - {fileID: 21300000, guid: 5c168ac4bb4009f429c8fb1de04cdd53, type: 3}
+  - {fileID: 21300000, guid: 02b95668751ced84bad0083579ad34da, type: 3}
+  - {fileID: 21300000, guid: f9d78605e6888464c92ab90e17e4353e, type: 3}
+  startledFrames:
+  - {fileID: 21300000, guid: 306e5db2835e8254881eeb09271c4676, type: 3}
+  - {fileID: 21300000, guid: b55d42da34019cb4599f5f0b8b45a7bc, type: 3}
+  - {fileID: 21300000, guid: 34ba85a200231b84698c3d406af2e054, type: 3}
+  - {fileID: 21300000, guid: 0672d326e2cbe9947a755554b47710b3, type: 3}
+  resistingFrames:
+  - {fileID: 21300000, guid: 582a2320372a82e47be136d10e3f77b5, type: 3}
+  - {fileID: 21300000, guid: 84ccb92f9102bf843b0d8268e36112f3, type: 3}
+  - {fileID: 21300000, guid: 1b909ff3a53cb72418266ede644c8456, type: 3}
+  - {fileID: 21300000, guid: 8acc3fb6a474d0241929eb92c9d8166d, type: 3}
+  settledFrames:
+  - {fileID: 21300000, guid: 0e5dd0d37b4fc5947a14ca0cbb7aee05, type: 3}
+  - {fileID: 21300000, guid: 8c0e2eb13a0d3df439db0f954212f26a, type: 3}
+  - {fileID: 21300000, guid: e513410d695955a488d09668962dcfea, type: 3}
+  - {fileID: 21300000, guid: 9bb2a673bc1f3a24faa6d0731c3a71e6, type: 3}
+  sittingUpFrames:
+  - {fileID: 21300000, guid: 7def14442e14de34191f03fbdb76b31b, type: 3}
+  - {fileID: 21300000, guid: 0b16975470dfd54438808cf8394355f2, type: 3}
+  - {fileID: 21300000, guid: cfd7c31ef4ac9b04e8956328016b6c47, type: 3}
+  - {fileID: 21300000, guid: 5c2d9a7e8e037f04f983c45d9ea5988d, type: 3}
   resourceRoot: Sprites/Caveheart
   frameCount: 4
   sleepingClipName: sleeping
@@ -1934,7 +2010,7 @@ BoxCollider2D:
   m_IsTrigger: 0
   m_UsedByEffector: 0
   m_UsedByComposite: 0
-  m_Offset: {x: 0, y: 0}
+  m_Offset: {x: -0.18565297, y: 0.69039714}
   m_SpriteTilingProperty:
     border: {x: 0, y: 0, z: 0, w: 0}
     pivot: {x: 0.5, y: 0.5}
@@ -1945,7 +2021,7 @@ BoxCollider2D:
     adaptiveTiling: 0
   m_AutoTiling: 0
   serializedVersion: 2
-  m_Size: {x: 2.3, y: 0.9}
+  m_Size: {x: 2.6713057, y: 1.0276368}
   m_EdgeRadius: 0
 --- !u!114 &3000000004
 MonoBehaviour:

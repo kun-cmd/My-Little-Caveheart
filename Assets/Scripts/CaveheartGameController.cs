@@ -8,7 +8,6 @@ namespace MyLittleCaveheart
     public sealed class CaveheartGameController : MonoBehaviour
     {
         private const string OpeningGoalText = "Help him sit up gently. Watch if he is awake, safe, and calm.";
-        private const string CurtainBackgroundObjectName = "caveheart_morning_cave_bedroom_bg_v1";
 
         private enum MorningOutcome
         {
@@ -36,13 +35,63 @@ namespace MyLittleCaveheart
         [SerializeField] private SpriteRenderer curtainBackgroundRenderer;
         [SerializeField] private Sprite closedCurtainBackground;
         [SerializeField] private Sprite openCurtainBackground;
+        [SerializeField] private bool resetCurtainOnMorning = true;
+
+        [Header("Cursor Images")]
+        [SerializeField] private Texture2D urgeCursor;
+        [SerializeField] private Texture2D touchCursor;
+        [SerializeField] private Texture2D waterCursor;
+        [SerializeField] private Texture2D windowCursor;
+        [SerializeField] private Texture2D scratchCursor;
+        [SerializeField] private Texture2D observeCursor;
+
+        [Header("Music")]
+        [SerializeField] private AudioClip backgroundMusicClip;
+        [SerializeField, Range(0f, 1f)] private float backgroundMusicVolume = 0.28f;
+
+        [Header("UI Images")]
+        [SerializeField] private Sprite outcomePanelSprite;
+        [SerializeField] private Sprite restartButtonSprite;
+        [SerializeField] private Sprite signalBarTrackSprite;
+
+        [Header("HUD Layout")]
+        [SerializeField] private Vector2 reactionTextPosition = new Vector2(0f, -72f);
+        [SerializeField] private Vector2 reactionTextSize = new Vector2(760f, 190f);
+        [SerializeField] private Vector2 timeTextPosition = new Vector2(-24f, -24f);
+        [SerializeField] private Vector2 timeTextSize = new Vector2(300f, 52f);
+        [SerializeField] private Vector2 debugValuesPosition = new Vector2(-24f, -72f);
+        [SerializeField] private Vector2 debugValuesSize = new Vector2(260f, 128f);
+        [SerializeField] private Vector2 awakeBarPosition = new Vector2(-24f, -112f);
+        [SerializeField] private Vector2 trustBarPosition = new Vector2(-24f, -158f);
+        [SerializeField] private Vector2 stressBarPosition = new Vector2(-24f, -204f);
+
+        [Header("Hover Label")]
+        [SerializeField] private Vector2 hoverLabelSize = new Vector2(260f, 58f);
+        [SerializeField] private Vector2 hoverLabelOffset = new Vector2(18f, -18f);
+        [SerializeField, Min(0f)] private float hoverLabelDelay = 0.35f;
+
+        [Header("Observe Hold Ring")]
+        [SerializeField] private bool holdToObserve = true;
+        [SerializeField, Min(0.05f)] private float observeHoldDuration = 1f;
+        [SerializeField, Min(0.1f)] private float observeHoldReturnSpeed = 3.5f;
+        [SerializeField, Min(4f)] private float observeHoldRingRadius = 48f;
+        [SerializeField, Min(1f)] private float observeHoldRingWidth = 8f;
+        [SerializeField] private Vector2 observeHoldRingOffset = Vector2.zero;
+        [SerializeField] private Color observeHoldIdleRingColor = new Color(0f, 0f, 0f, 0.34f);
+        [SerializeField] private Color observeHoldWarmStartColor = new Color(1f, 0.48f, 0.14f, 0.88f);
+        [SerializeField] private Color observeHoldWarmEndColor = new Color(1f, 0.76f, 0.32f, 0.96f);
+
+        [Header("Outcome Layout")]
+        [SerializeField] private Vector2 outcomePanelPosition = Vector2.zero;
+        [SerializeField] private Vector2 outcomePanelSize = new Vector2(800f, 260f);
+        [SerializeField] private Vector2 restartButtonPosition = new Vector2(0f, 18f);
+        [SerializeField] private Vector2 restartButtonSize = new Vector2(160f, 44f);
 
         public event Action<CaveheartInteractionResult> InteractionResolved;
         public event Action<CaveheartState, CaveheartStats> StateChanged;
         public event Action<CaveheartInteractionType?, Vector3> InteractionHoverChanged;
 
         private Text hudValuesText;
-        private Text hudStateText;
         private Text hudReactionText;
         private Text hudTimeText;
         private RectTransform hudAwakeFill;
@@ -53,6 +102,12 @@ namespace MyLittleCaveheart
         private Button hudRestartButton;
         private Text hudHoverText;
         private RectTransform hudHoverRect;
+        private RectTransform observeHoldRingRect;
+        private RawImage observeHoldIdleRingImage;
+        private RawImage observeHoldProgressRingImage;
+        private Texture2D observeHoldIdleTexture;
+        private Texture2D observeHoldProgressTexture;
+        private int observeHoldTextureSize;
         private float elapsedSeconds;
         private int usedMorningMinutes;
         private int blanketUseCount;
@@ -76,13 +131,8 @@ namespace MyLittleCaveheart
         private CaveheartInteractionType? hoveredInteraction;
         private bool hoveredInteractionAvailable;
         private float hoverStartedAt;
-        private Texture2D urgeCursor;
-        private Texture2D touchCursor;
-        private Texture2D waterCursor;
-        private Texture2D windowCursor;
-        private Texture2D scratchCursor;
-        private Texture2D observeCursor;
-
+        private float observeHoldProgress;
+        private bool observeHoldTriggeredThisPress;
         public CaveheartStats Stats => stats;
         public CaveheartState CurrentState => currentState;
         public int UsedMorningMinutes => usedMorningMinutes;
@@ -98,19 +148,22 @@ namespace MyLittleCaveheart
         {
             BeginMorning();
             EnsureCurtainBackground();
-            SetCurtainBackground(false);
+            if (resetCurtainOnMorning)
+            {
+                SetCurtainBackground(false);
+            }
+
             EnsureClickFeedbackObject();
             PruneRetiredInteractables();
             EnsureWorldInteractionZones();
             EnsureCharacterView();
             EnsureSpriteAnimator();
             EnsureEnvironmentFeedback();
-            CaveheartBackgroundMusic.Ensure();
+            CaveheartBackgroundMusic.Ensure(backgroundMusicClip, backgroundMusicVolume);
             EnsureWhiteboxHud();
             ApplyInteractionCursor(null, false);
             PublishState();
             UpdateWhiteboxHudValues();
-            UpdateStateText();
             characterView?.ApplyState(currentState, stats);
             spriteAnimator?.Play(currentState);
             UpdateOutcomeUi();
@@ -129,7 +182,6 @@ namespace MyLittleCaveheart
             UpdateWorldInteractionInput();
             UpdateHoverTooltip();
             UpdateWhiteboxHudValues();
-            UpdateStateText();
         }
 
         public bool IsInteractionAvailable(CaveheartInteractionType interactionType)
@@ -298,10 +350,13 @@ namespace MyLittleCaveheart
         {
             BeginMorning();
             EnsureCurtainBackground();
-            SetCurtainBackground(false);
+            if (resetCurtainOnMorning)
+            {
+                SetCurtainBackground(false);
+            }
+
             SetHoveredInteraction(null, Vector3.zero);
             PublishState();
-            UpdateStateText();
             characterView?.SetHasAcceptedWater(hasAcceptedWater);
             characterView?.ApplyState(currentState, stats);
             spriteAnimator?.Play(currentState);
@@ -441,12 +496,14 @@ namespace MyLittleCaveheart
             if (!Application.isPlaying || (lockAfterEnding && IsEnded))
             {
                 SetHoveredInteraction(null, Vector3.zero);
+                UpdateObserveHoldInput(null);
                 return;
             }
 
             if (EventSystem.current != null && EventSystem.current.IsPointerOverGameObject())
             {
                 SetHoveredInteraction(null, Vector3.zero);
+                UpdateObserveHoldInput(null);
                 return;
             }
 
@@ -454,6 +511,7 @@ namespace MyLittleCaveheart
             if (camera == null)
             {
                 SetHoveredInteraction(null, Vector3.zero);
+                UpdateObserveHoldInput(null);
                 return;
             }
 
@@ -478,12 +536,60 @@ namespace MyLittleCaveheart
             }
 
             SetHoveredInteraction(bestZone, worldPoint3D);
+            UpdateObserveHoldInput(bestZone);
             if (bestZone != null
                 && IsInteractionAvailable(bestZone.InteractionType)
-                && Input.GetMouseButtonDown(0))
+                && Input.GetMouseButtonDown(0)
+                && !RequiresHoldToObserve(bestZone.InteractionType))
             {
                 bestZone.TryInteract();
             }
+        }
+
+        private bool RequiresHoldToObserve(CaveheartInteractionType interactionType)
+        {
+            return holdToObserve && interactionType == CaveheartInteractionType.Wait;
+        }
+
+        private void UpdateObserveHoldInput(CaveheartClickable zone)
+        {
+            var canHoldObserve = zone != null
+                && RequiresHoldToObserve(zone.InteractionType)
+                && IsInteractionAvailable(zone.InteractionType);
+
+            if (!canHoldObserve)
+            {
+                observeHoldTriggeredThisPress = false;
+                observeHoldProgress = 0f;
+                UpdateObserveHoldIndicator(false);
+                return;
+            }
+
+            if (!Input.GetMouseButton(0))
+            {
+                observeHoldTriggeredThisPress = false;
+                observeHoldProgress = Mathf.MoveTowards(
+                    observeHoldProgress,
+                    0f,
+                    Time.unscaledDeltaTime * observeHoldReturnSpeed);
+            }
+            else if (!observeHoldTriggeredThisPress)
+            {
+                var duration = Mathf.Max(0.05f, observeHoldDuration);
+                observeHoldProgress = Mathf.MoveTowards(
+                    observeHoldProgress,
+                    1f,
+                    Time.unscaledDeltaTime / duration);
+
+                if (observeHoldProgress >= 1f)
+                {
+                    observeHoldProgress = 1f;
+                    observeHoldTriggeredThisPress = true;
+                    zone.TryInteract();
+                }
+            }
+
+            UpdateObserveHoldIndicator(true);
         }
 
         private void SetHoveredInteraction(CaveheartClickable zone, Vector3 worldPosition)
@@ -580,6 +686,7 @@ namespace MyLittleCaveheart
             mesh.characterSize = 0.28f;
             mesh.fontSize = 42;
             mesh.color = Color.white;
+            CaveheartTypography.ApplyTo(mesh);
             label.GetComponent<MeshRenderer>().sortingOrder = 30;
         }
 
@@ -624,18 +731,9 @@ namespace MyLittleCaveheart
 
         private void EnsureCurtainBackground()
         {
-            if (curtainBackgroundRenderer == null)
-            {
-                var backgroundObject = GameObject.Find(CurtainBackgroundObjectName);
-                if (backgroundObject != null)
-                {
-                    curtainBackgroundRenderer = backgroundObject.GetComponent<SpriteRenderer>();
-                }
-            }
-
             if (curtainBackgroundRenderer == null || closedCurtainBackground == null || openCurtainBackground == null)
             {
-                Debug.LogWarning("Caveheart curtain backgrounds are not fully configured.", this);
+                Debug.LogWarning("Caveheart curtain backgrounds are not fully configured on GameController.", this);
             }
         }
 
@@ -687,22 +785,208 @@ namespace MyLittleCaveheart
             EnsureEventSystem();
 
             RemoveObsoleteUiElement(uiRoot.transform, "Whitebox Runtime State Text");
+            RemoveObsoleteUiElement(uiRoot.transform, "State Text");
             RemoveObsoleteUiElement(uiRoot.transform, "Whitebox Runtime Reaction Text");
             RemoveObsoleteUiElement(uiRoot.transform, "Whitebox Runtime Time Text");
             RemoveObsoleteUiElement(uiRoot.transform, "Debug Text Toggle Mirror");
             RemoveObsoleteUiElement(uiRoot.transform, "Ending Text");
             RemoveObsoleteUiElement(uiRoot.transform, "Observe Button");
+            RemoveObsoleteUiElement(uiRoot.transform, "Observe Hold Ring");
 
-            hudValuesText = FindOrCreateHudText(uiRoot.transform, "Whitebox Values Text", new Vector2(-24f, -72f), new Vector2(260f, 128f), TextAnchor.UpperRight, 20);
-            hudStateText = FindOrCreateHudText(uiRoot.transform, "State Text", new Vector2(24f, -24f), new Vector2(420f, 56f), TextAnchor.UpperLeft, 24);
+            hudValuesText = FindOrCreateHudText(uiRoot.transform, "Whitebox Values Text", debugValuesPosition, debugValuesSize, TextAnchor.UpperRight, 20);
             FindOrCreateSignalBars(uiRoot.transform);
-            hudReactionText = FindOrCreateHudText(uiRoot.transform, "Reaction Text", new Vector2(0f, -72f), new Vector2(760f, 190f), TextAnchor.UpperCenter, 20);
-            hudTimeText = FindOrCreateHudText(uiRoot.transform, "Time Text", new Vector2(-24f, -24f), new Vector2(300f, 52f), TextAnchor.UpperRight, 22);
+            hudReactionText = FindOrCreateHudText(uiRoot.transform, "Reaction Text", reactionTextPosition, reactionTextSize, TextAnchor.UpperCenter, 20);
+            hudTimeText = FindOrCreateHudText(uiRoot.transform, "Time Text", timeTextPosition, timeTextSize, TextAnchor.UpperRight, 22);
+            EnsureObserveHoldIndicator(uiRoot.transform);
             EnsureHoverTooltip(uiRoot.transform);
             FindOrCreateOutcomeUi(uiRoot.transform);
             RemoveActionButtons(uiRoot.transform);
             hudReactionText.text = OpeningGoalText;
-            UpdateStateText();
+        }
+
+        private void EnsureObserveHoldIndicator(Transform parent)
+        {
+            var ringTransform = parent.Find("Observe Cursor Ring");
+            var ringObject = ringTransform == null ? new GameObject("Observe Cursor Ring") : ringTransform.gameObject;
+            ringObject.transform.SetParent(parent, false);
+            ringObject.transform.SetAsLastSibling();
+
+            observeHoldRingRect = ringObject.GetComponent<RectTransform>();
+            if (observeHoldRingRect == null)
+            {
+                observeHoldRingRect = ringObject.AddComponent<RectTransform>();
+            }
+
+            observeHoldRingRect.anchorMin = new Vector2(0.5f, 0.5f);
+            observeHoldRingRect.anchorMax = new Vector2(0.5f, 0.5f);
+            observeHoldRingRect.pivot = new Vector2(0.5f, 0.5f);
+
+            RemoveObsoleteUiElement(ringObject.transform, "Observe Icon");
+            observeHoldIdleRingImage = FindOrCreateRingImage(ringObject.transform, "Idle Ring");
+            observeHoldProgressRingImage = FindOrCreateRingImage(ringObject.transform, "Progress Ring");
+            UpdateObserveHoldIndicator(false);
+        }
+
+        private static RawImage FindOrCreateRingImage(Transform parent, string objectName)
+        {
+            var imageTransform = parent.Find(objectName);
+            var imageObject = imageTransform == null ? new GameObject(objectName) : imageTransform.gameObject;
+            imageObject.transform.SetParent(parent, false);
+
+            var rect = imageObject.GetComponent<RectTransform>();
+            if (rect == null)
+            {
+                rect = imageObject.AddComponent<RectTransform>();
+            }
+
+            rect.anchorMin = new Vector2(0.5f, 0.5f);
+            rect.anchorMax = new Vector2(0.5f, 0.5f);
+            rect.pivot = new Vector2(0.5f, 0.5f);
+            rect.anchoredPosition = Vector2.zero;
+
+            var image = imageObject.GetComponent<RawImage>();
+            if (image == null)
+            {
+                image = imageObject.AddComponent<RawImage>();
+            }
+
+            image.color = Color.white;
+            image.raycastTarget = false;
+            return image;
+        }
+
+        private void UpdateObserveHoldIndicator(bool visible)
+        {
+            if (observeHoldIdleRingImage == null || observeHoldProgressRingImage == null || observeHoldRingRect == null)
+            {
+                return;
+            }
+
+            var outerRadius = observeHoldRingRadius + observeHoldRingWidth * 0.5f;
+            var size = Mathf.CeilToInt((outerRadius + 3f) * 2f);
+            observeHoldRingRect.SetAsLastSibling();
+            observeHoldRingRect.sizeDelta = Vector2.one * size;
+            observeHoldIdleRingImage.rectTransform.sizeDelta = Vector2.one * size;
+            observeHoldProgressRingImage.rectTransform.sizeDelta = Vector2.one * size;
+            observeHoldIdleRingImage.enabled = true;
+            observeHoldProgressRingImage.enabled = true;
+            observeHoldIdleRingImage.transform.SetAsFirstSibling();
+            observeHoldProgressRingImage.transform.SetAsLastSibling();
+            EnsureObserveHoldTextures(size);
+            DrawRingTexture(observeHoldIdleTexture, 1f, observeHoldIdleRingColor, observeHoldIdleRingColor);
+            DrawRingTexture(observeHoldProgressTexture, observeHoldProgress, observeHoldWarmStartColor, observeHoldWarmEndColor);
+
+            if (visible)
+            {
+                PositionObserveHoldIndicator();
+            }
+
+            observeHoldRingRect.gameObject.SetActive(visible);
+        }
+
+        private void EnsureObserveHoldTextures(int size)
+        {
+            size = Mathf.Clamp(size, 16, 512);
+            if (observeHoldTextureSize == size && observeHoldIdleTexture != null && observeHoldProgressTexture != null)
+            {
+                return;
+            }
+
+            observeHoldTextureSize = size;
+            observeHoldIdleTexture = CreateRingTexture(size, "Caveheart Observe Hold Idle Ring");
+            observeHoldProgressTexture = CreateRingTexture(size, "Caveheart Observe Hold Progress Ring");
+            observeHoldIdleRingImage.texture = observeHoldIdleTexture;
+            observeHoldProgressRingImage.texture = observeHoldProgressTexture;
+        }
+
+        private static Texture2D CreateRingTexture(int size, string textureName)
+        {
+            var texture = new Texture2D(size, size, TextureFormat.RGBA32, false);
+            texture.name = textureName;
+            texture.wrapMode = TextureWrapMode.Clamp;
+            texture.filterMode = FilterMode.Bilinear;
+            texture.hideFlags = HideFlags.HideAndDontSave;
+            return texture;
+        }
+
+        private void DrawRingTexture(Texture2D texture, float amount, Color startColor, Color endColor)
+        {
+            if (texture == null)
+            {
+                return;
+            }
+
+            var size = texture.width;
+            var pixels = new Color32[size * size];
+            var center = (size - 1) * 0.5f;
+            var outerRadius = observeHoldRingRadius + observeHoldRingWidth * 0.5f;
+            var innerRadius = Mathf.Max(0f, observeHoldRingRadius - observeHoldRingWidth * 0.5f);
+            var progressDegrees = 360f * Mathf.Clamp01(amount);
+            var feather = 1.25f;
+
+            for (var y = 0; y < size; y++)
+            {
+                for (var x = 0; x < size; x++)
+                {
+                    var dx = x - center;
+                    var dy = y - center;
+                    var distance = Mathf.Sqrt(dx * dx + dy * dy);
+                    var ringAlpha = Mathf.Clamp01((distance - innerRadius) / feather)
+                        * Mathf.Clamp01((outerRadius - distance) / feather);
+                    if (ringAlpha <= 0f || progressDegrees <= 0f)
+                    {
+                        pixels[y * size + x] = new Color32(0, 0, 0, 0);
+                        continue;
+                    }
+
+                    var angle = Mathf.Atan2(dy, dx) * Mathf.Rad2Deg;
+                    var clockwiseFromTop = Mathf.Repeat(90f - angle, 360f);
+                    if (clockwiseFromTop > progressDegrees)
+                    {
+                        pixels[y * size + x] = new Color32(0, 0, 0, 0);
+                        continue;
+                    }
+
+                    var t = progressDegrees <= 0f ? 0f : Mathf.Clamp01(clockwiseFromTop / Mathf.Max(0.001f, progressDegrees));
+                    var color = WarmRingColor(startColor, endColor, t, distance, clockwiseFromTop);
+                    color.a *= ringAlpha;
+                    pixels[y * size + x] = color;
+                }
+            }
+
+            texture.SetPixels32(pixels);
+            texture.Apply(false, false);
+        }
+
+        private static Color WarmRingColor(Color startColor, Color endColor, float t, float distance, float angle)
+        {
+            var color = Color.Lerp(startColor, endColor, t);
+            var paperVariation = Mathf.Sin(angle * 0.19f + distance * 0.31f) * 0.035f;
+            color.r = Mathf.Clamp01(color.r + paperVariation);
+            color.g = Mathf.Clamp01(color.g + paperVariation * 0.55f);
+            color.b = Mathf.Clamp01(color.b - paperVariation * 0.15f);
+            return color;
+        }
+
+        private void PositionObserveHoldIndicator()
+        {
+            var canvasRect = observeHoldRingRect.parent as RectTransform;
+            if (canvasRect == null
+                || !RectTransformUtility.ScreenPointToLocalPointInRectangle(
+                    canvasRect,
+                    Input.mousePosition,
+                    null,
+                    out var localPoint))
+            {
+                return;
+            }
+
+            var halfSize = observeHoldRingRect.sizeDelta * 0.5f;
+            var canvasBounds = canvasRect.rect;
+            localPoint += observeHoldRingOffset;
+            localPoint.x = Mathf.Clamp(localPoint.x, canvasBounds.xMin + halfSize.x, canvasBounds.xMax - halfSize.x);
+            localPoint.y = Mathf.Clamp(localPoint.y, canvasBounds.yMin + halfSize.y, canvasBounds.yMax - halfSize.y);
+            observeHoldRingRect.anchoredPosition = localPoint;
         }
 
         private void EnsureHoverTooltip(Transform parent)
@@ -711,7 +995,7 @@ namespace MyLittleCaveheart
                 parent,
                 "Interaction Hover Text",
                 Vector2.zero,
-                new Vector2(260f, 58f),
+                hoverLabelSize,
                 TextAnchor.UpperLeft,
                 18);
             hudHoverRect = hudHoverText.rectTransform;
@@ -729,7 +1013,7 @@ namespace MyLittleCaveheart
                 return;
             }
 
-            if (!hoveredInteraction.HasValue || Time.unscaledTime - hoverStartedAt < 0.35f)
+            if (!hoveredInteraction.HasValue || Time.unscaledTime - hoverStartedAt < hoverLabelDelay)
             {
                 hudHoverText.gameObject.SetActive(false);
                 return;
@@ -757,7 +1041,7 @@ namespace MyLittleCaveheart
             }
 
             var canvasBounds = canvasRect.rect;
-            localPoint += new Vector2(18f, -18f);
+            localPoint += hoverLabelOffset;
             localPoint.x = Mathf.Clamp(localPoint.x, canvasBounds.xMin + 8f, canvasBounds.xMax - hudHoverRect.rect.width - 8f);
             localPoint.y = Mathf.Clamp(localPoint.y, canvasBounds.yMin + hudHoverRect.rect.height + 8f, canvasBounds.yMax - 8f);
             hudHoverRect.anchoredPosition = localPoint;
@@ -803,13 +1087,15 @@ namespace MyLittleCaveheart
 
         private void ApplyInteractionCursor(CaveheartInteractionType? interaction, bool available)
         {
+            Cursor.visible = true;
+
             var texture = interaction.HasValue && available
                 ? CursorTexture(interaction.Value)
                 : null;
             var hotspot = texture == null
                 ? Vector2.zero
                 : new Vector2(texture.width * 0.5f, texture.height * 0.5f);
-            Cursor.SetCursor(texture, hotspot, CursorMode.Auto);
+            Cursor.SetCursor(texture, hotspot, CursorMode.ForceSoftware);
         }
 
         private Texture2D CursorTexture(CaveheartInteractionType interaction)
@@ -817,26 +1103,61 @@ namespace MyLittleCaveheart
             switch (interaction)
             {
                 case CaveheartInteractionType.Alarm:
-                    return urgeCursor != null ? urgeCursor : urgeCursor = LoadCursorTexture("cursor_rooster_crow_64");
+                    return urgeCursor = EnsureCursorTexture(urgeCursor, "cursor_rooster_crow_64");
                 case CaveheartInteractionType.GentleTouch:
-                    return touchCursor != null ? touchCursor : touchCursor = LoadCursorTexture("cursor_touch_64");
+                    return touchCursor = EnsureCursorTexture(touchCursor, "cursor_touch_64");
                 case CaveheartInteractionType.OfferWater:
-                    return waterCursor != null ? waterCursor : waterCursor = LoadCursorTexture("cursor_wooden_cup_64");
+                    return waterCursor = EnsureCursorTexture(waterCursor, "cursor_wooden_cup_64");
                 case CaveheartInteractionType.OpenCurtain:
-                    return windowCursor != null ? windowCursor : windowCursor = LoadCursorTexture("cursor_curtain_open_64");
+                    return windowCursor = EnsureCursorTexture(windowCursor, "cursor_curtain_open_64");
                 case CaveheartInteractionType.Scratch:
-                    return scratchCursor != null ? scratchCursor : scratchCursor = LoadCursorTexture("cursor_tickled_64");
+                    return scratchCursor = EnsureCursorTexture(scratchCursor, "cursor_tickled_64");
                 case CaveheartInteractionType.Wait:
-                    return observeCursor != null ? observeCursor : observeCursor = LoadCursorTexture("cursor_observe_eye_64");
+                    return observeCursor = EnsureCursorTexture(observeCursor, "cursor_observe_eye_64");
                 default:
                     return null;
             }
         }
 
+        // Returns a runtime-safe cursor texture whether the source came from the Inspector or Resources.
+        private static Texture2D EnsureCursorTexture(Texture2D currentTexture, string assetName)
+        {
+            var source = currentTexture != null ? currentTexture : LoadCursorTexture(assetName);
+            if (source == null || source.name.EndsWith(" Cursor Runtime"))
+            {
+                return source;
+            }
+
+            return CreateCursorCompatibleTexture(source, assetName);
+        }
+
         private static Texture2D LoadCursorTexture(string assetName)
         {
             var sprite = LoadCursorSprite(assetName);
-            return sprite == null ? null : sprite.texture;
+            if (sprite != null)
+            {
+                return sprite.texture;
+            }
+
+            return Resources.Load<Texture2D>($"Sprites/Caveheart/CursorIcons/Size64/{assetName}");
+        }
+
+        // Copies imported cursor art into RGBA32 without mipmaps so Unity accepts it in Cursor.SetCursor.
+        private static Texture2D CreateCursorCompatibleTexture(Texture2D source, string assetName)
+        {
+            if (source == null)
+            {
+                return null;
+            }
+
+            var cursor = new Texture2D(source.width, source.height, TextureFormat.RGBA32, false);
+            cursor.name = assetName + " Cursor Runtime";
+            cursor.wrapMode = TextureWrapMode.Clamp;
+            cursor.filterMode = FilterMode.Bilinear;
+            cursor.hideFlags = HideFlags.HideAndDontSave;
+            cursor.SetPixels32(source.GetPixels32());
+            cursor.Apply(false, false);
+            return cursor;
         }
 
         private static Sprite LoadCursorSprite(string assetName)
@@ -846,6 +1167,7 @@ namespace MyLittleCaveheart
 
         private void OnDisable()
         {
+            Cursor.visible = true;
             Cursor.SetCursor(null, Vector2.zero, CursorMode.Auto);
         }
 
@@ -918,13 +1240,18 @@ namespace MyLittleCaveheart
             panelRect.anchorMin = new Vector2(0.5f, 0.5f);
             panelRect.anchorMax = new Vector2(0.5f, 0.5f);
             panelRect.pivot = new Vector2(0.5f, 0.5f);
-            panelRect.sizeDelta = new Vector2(800f, 260f);
-            panelRect.anchoredPosition = Vector2.zero;
+            panelRect.sizeDelta = outcomePanelSize;
+            panelRect.anchoredPosition = outcomePanelPosition;
 
             hudOutcomePanel = panelObject.GetComponent<Image>();
             if (hudOutcomePanel == null)
             {
                 hudOutcomePanel = panelObject.AddComponent<Image>();
+            }
+
+            if (outcomePanelSprite != null)
+            {
+                hudOutcomePanel.sprite = outcomePanelSprite;
             }
 
             hudOutcomePanel.color = new Color(0.07f, 0.08f, 0.08f, 0.88f);
@@ -950,7 +1277,7 @@ namespace MyLittleCaveheart
                 hudOutcomeText = textObject.AddComponent<Text>();
             }
 
-            hudOutcomeText.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            CaveheartTypography.ApplyTo(hudOutcomeText);
             hudOutcomeText.fontSize = 28;
             hudOutcomeText.alignment = TextAnchor.MiddleCenter;
             hudOutcomeText.color = Color.white;
@@ -975,13 +1302,18 @@ namespace MyLittleCaveheart
             rect.anchorMin = new Vector2(0.5f, 0f);
             rect.anchorMax = new Vector2(0.5f, 0f);
             rect.pivot = new Vector2(0.5f, 0f);
-            rect.sizeDelta = new Vector2(160f, 44f);
-            rect.anchoredPosition = new Vector2(0f, 18f);
+            rect.sizeDelta = restartButtonSize;
+            rect.anchoredPosition = restartButtonPosition;
 
             var image = buttonObject.GetComponent<Image>();
             if (image == null)
             {
                 image = buttonObject.AddComponent<Image>();
+            }
+
+            if (restartButtonSprite != null)
+            {
+                image.sprite = restartButtonSprite;
             }
 
             image.color = new Color(0.18f, 0.24f, 0.22f, 0.95f);
@@ -1016,7 +1348,7 @@ namespace MyLittleCaveheart
                 label = labelObject.AddComponent<Text>();
             }
 
-            label.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            CaveheartTypography.ApplyTo(label);
             label.text = "Restart";
             label.fontSize = 20;
             label.alignment = TextAnchor.MiddleCenter;
@@ -1037,12 +1369,12 @@ namespace MyLittleCaveheart
 
         private void FindOrCreateSignalBars(Transform parent)
         {
-            hudAwakeFill = FindOrCreateSignalBar(parent, "Awake Signal Bar", "Awake", new Vector2(-24f, -112f), new Color(0.92f, 0.78f, 0.38f, 0.92f));
-            hudTrustFill = FindOrCreateSignalBar(parent, "Trust Signal Bar", "Trust", new Vector2(-24f, -158f), new Color(0.36f, 0.78f, 0.62f, 0.92f));
-            hudStressFill = FindOrCreateSignalBar(parent, "Stress Signal Bar", "Stress", new Vector2(-24f, -204f), new Color(0.54f, 0.68f, 0.94f, 0.92f));
+            hudAwakeFill = FindOrCreateSignalBar(parent, "Awake Signal Bar", "Awake", awakeBarPosition, new Color(0.92f, 0.78f, 0.38f, 0.92f));
+            hudTrustFill = FindOrCreateSignalBar(parent, "Trust Signal Bar", "Trust", trustBarPosition, new Color(0.36f, 0.78f, 0.62f, 0.92f));
+            hudStressFill = FindOrCreateSignalBar(parent, "Stress Signal Bar", "Stress", stressBarPosition, new Color(0.54f, 0.68f, 0.94f, 0.92f));
         }
 
-        private static RectTransform FindOrCreateSignalBar(Transform parent, string objectName, string labelText, Vector2 anchoredPosition, Color fillColor)
+        private RectTransform FindOrCreateSignalBar(Transform parent, string objectName, string labelText, Vector2 anchoredPosition, Color fillColor)
         {
             var existing = parent.Find(objectName);
             var obj = existing == null ? new GameObject(objectName) : existing.gameObject;
@@ -1086,6 +1418,11 @@ namespace MyLittleCaveheart
             if (backgroundImage == null)
             {
                 backgroundImage = background.AddComponent<Image>();
+            }
+
+            if (signalBarTrackSprite != null)
+            {
+                backgroundImage.sprite = signalBarTrackSprite;
             }
 
             backgroundImage.color = new Color(0.03f, 0.04f, 0.045f, 0.72f);
@@ -1157,7 +1494,7 @@ namespace MyLittleCaveheart
                 text = obj.AddComponent<Text>();
             }
 
-            text.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            CaveheartTypography.ApplyTo(text);
             text.fontSize = fontSize;
             text.alignment = anchor;
             text.color = Color.white;
@@ -1505,28 +1842,6 @@ namespace MyLittleCaveheart
             return MorningOutcome.Bad;
         }
 
-        private void UpdateStateText()
-        {
-            var text = VisibleStateText(currentState);
-            if (hudStateText != null)
-            {
-                hudStateText.text = text;
-            }
-        }
-
-        private static string VisibleStateText(CaveheartState state)
-        {
-            switch (state)
-            {
-                case CaveheartState.Sleeping: return "He is still deeply asleep.";
-                case CaveheartState.Startled: return "He is more awake, but still unsettled.";
-                case CaveheartState.Resisting: return "His body tenses against you.";
-                case CaveheartState.Settled: return "He is calmer now.";
-                case CaveheartState.SittingUp: return "He is ready to move.";
-                default: return "He is hard to read right now.";
-            }
-        }
-
         private void LogWhiteboxInteraction(CaveheartInteractionResult result, CaveheartState previousState)
         {
             if (!logWhiteboxInteractions)
@@ -1547,4 +1862,5 @@ namespace MyLittleCaveheart
                 this);
         }
     }
+
 }
