@@ -9,10 +9,10 @@ namespace MyLittleCaveheart
     {
         private const int TimeoutMinutes = 7;
         private const string ExamStateSpriteRoot = "Sprites/Caveheart/Level3School/States1254/";
-        private const string OverwhelmedSpriteName = "caveheart_level3_state_overwhelmed_v1_1254";
-        private const string SittingSpriteName = "caveheart_level3_state_sitting_v1_1254";
-        private const string ObservingSpriteName = "caveheart_level3_state_observing_v1_1254";
-        private const string GroundedSpriteName = "caveheart_level3_state_grounded_v1_1254";
+        private const string OverwhelmedSpriteName = "caveheart_level2_state_overwhelmed_v1_1254";
+        private const string SittingSpriteName = "caveheart_level2_state_sitting_v1_1254";
+        private const string ObservingSpriteName = "caveheart_level2_state_observing_v1_1254";
+        private const string GroundedSpriteName = "caveheart_level2_state_grounded_v1_1254";
         private const string PressureMusicPath = "Audio/Caveheart/level3_cave_exam_pressure";
         private const string GroundedMusicPath = "Audio/Caveheart/level3_stone_marimba_grounded";
         private const string ObserveHoldStartSfxPath = "Audio/Caveheart/action_observe_breath";
@@ -1391,9 +1391,8 @@ namespace MyLittleCaveheart
             observeVisualActive = false;
             observeVisualGraceUntil = 0f;
             ShowThoughtCursorHint(false, 0f);
+            cursorVisuals?.SetCursorMode(ExamCursorMode.Default);
             cursorVisuals?.SetObserveHold(false, 0f);
-            Cursor.visible = true;
-            Cursor.SetCursor(null, Vector2.zero, CursorMode.Auto);
             feedback.Show(finalText);
 
             if (targetEnding == ExamLevelEnding.Victory)

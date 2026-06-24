@@ -209,8 +209,6 @@ namespace MyLittleCaveheart
             canvasGroup.alpha = 1f;
             canvasGroup.interactable = true;
             canvasGroup.blocksRaycasts = true;
-            Cursor.visible = true;
-            Cursor.SetCursor(null, Vector2.zero, CursorMode.Auto);
         }
 
         // Assigns a button icon and explicitly enables the Image after it was created from a null sprite.

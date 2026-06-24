@@ -10,12 +10,17 @@ namespace MyLittleCaveheart
         Grab
     }
 
+    [DefaultExecutionOrder(10000)]
     public sealed class ExamCursorVisuals : MonoBehaviour
     {
+        private const string CursorResourceRoot = "Sprites/Caveheart/CursorIcons/Size64/";
+
         [Header("Cursor Images")]
         [SerializeField] private Texture2D defaultCursor;
         [SerializeField] private Texture2D handCursor;
         [SerializeField] private Texture2D grabCursor;
+        [SerializeField, Min(8f)] private float cursorImageSize = 37f;
+        [SerializeField] private Vector2 cursorImageOffset = Vector2.zero;
 
         [Header("Observe Hold Ring")]
         [SerializeField, Min(0.1f)] private float observeHoldRingRadius = 48f;
@@ -23,6 +28,8 @@ namespace MyLittleCaveheart
         [SerializeField] private Vector2 observeHoldRingOffset = Vector2.zero;
         [SerializeField] private Color observeHoldIdleRingColor = new Color(0f, 0f, 0f, 0.34f);
 
+        private RectTransform cursorImageRect;
+        private RawImage cursorImage;
         private RectTransform observeHoldRingRect;
         private RawImage observeHoldIdleRingImage;
         private RawImage observeHoldProgressRingImage;
@@ -31,19 +38,35 @@ namespace MyLittleCaveheart
         private int observeHoldTextureSize;
         private ExamCursorMode currentMode = (ExamCursorMode)(-1);
 
+        // Reclaims the native cursor when this component is re-enabled after scene or inspector changes.
+        private void OnEnable()
+        {
+            CaveheartCursorVisibilityGuard.SetOverrideActive(this, true);
+        }
+
         // Builds the cursor UI container before the interaction tracker starts using it.
         private void Awake()
         {
-            EnsureObserveHoldIndicator(EnsureUiRoot().transform);
+            var uiRoot = EnsureUiRoot().transform;
+            EnsureCursorImage(uiRoot);
+            EnsureObserveHoldIndicator(uiRoot);
+            CaveheartCursorVisibilityGuard.SetOverrideActive(this, true);
             SetCursorMode(ExamCursorMode.Default);
             SetObserveHold(false, 0f);
+        }
+
+        // Keeps the UI cursor aligned while hiding it when the pointer leaves the game window.
+        private void LateUpdate()
+        {
+            UpdateCursorImageVisibility();
+            PositionCursorImage();
         }
 
         // Restores the OS cursor when this level controller is disabled.
         private void OnDisable()
         {
-            Cursor.visible = true;
-            Cursor.SetCursor(null, Vector2.zero, CursorMode.Auto);
+            HideCursorImage();
+            CaveheartCursorVisibilityGuard.SetOverrideActive(this, false);
             SetObserveHold(false, 0f);
         }
 
@@ -56,13 +79,7 @@ namespace MyLittleCaveheart
             }
 
             currentMode = mode;
-            Cursor.visible = true;
-
-            var texture = CursorTexture(mode);
-            var hotspot = texture == null
-                ? Vector2.zero
-                : new Vector2(texture.width * 0.5f, texture.height * 0.5f);
-            Cursor.SetCursor(texture, hotspot, CursorMode.ForceSoftware);
+            ApplyCursorImage(CursorTexture(currentMode));
         }
 
         // Shows or hides the observe hold ring and redraws its current progress.
@@ -94,6 +111,7 @@ namespace MyLittleCaveheart
             }
 
             observeHoldRingRect.gameObject.SetActive(visible);
+            cursorImageRect?.SetAsLastSibling();
         }
 
         // Creates or reuses a screen-space canvas for cursor-only UI elements.
@@ -112,6 +130,7 @@ namespace MyLittleCaveheart
             }
 
             canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+            canvas.sortingOrder = 5000;
 
             var scaler = uiRoot.GetComponent<CanvasScaler>();
             if (scaler == null)
@@ -119,9 +138,8 @@ namespace MyLittleCaveheart
                 scaler = uiRoot.AddComponent<CanvasScaler>();
             }
 
-            scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
-            scaler.referenceResolution = new Vector2(1920f, 1080f);
-            scaler.matchWidthOrHeight = 0.5f;
+            scaler.uiScaleMode = CanvasScaler.ScaleMode.ConstantPixelSize;
+            scaler.scaleFactor = 1f;
 
             if (uiRoot.GetComponent<GraphicRaycaster>() == null)
             {
@@ -129,6 +147,35 @@ namespace MyLittleCaveheart
             }
 
             return uiRoot;
+        }
+
+        // Creates the RawImage that visually replaces Unity's native cursor texture.
+        private void EnsureCursorImage(Transform parent)
+        {
+            var cursorTransform = parent.Find("Exam Cursor Image");
+            var cursorObject = cursorTransform == null ? new GameObject("Exam Cursor Image") : cursorTransform.gameObject;
+            cursorObject.transform.SetParent(parent, false);
+            cursorObject.transform.SetAsLastSibling();
+
+            cursorImageRect = cursorObject.GetComponent<RectTransform>();
+            if (cursorImageRect == null)
+            {
+                cursorImageRect = cursorObject.AddComponent<RectTransform>();
+            }
+
+            cursorImageRect.anchorMin = new Vector2(0.5f, 0.5f);
+            cursorImageRect.anchorMax = new Vector2(0.5f, 0.5f);
+            cursorImageRect.pivot = new Vector2(0.5f, 0.5f);
+            cursorImageRect.sizeDelta = Vector2.one * cursorImageSize;
+
+            cursorImage = cursorObject.GetComponent<RawImage>();
+            if (cursorImage == null)
+            {
+                cursorImage = cursorObject.AddComponent<RawImage>();
+            }
+
+            cursorImage.color = Color.white;
+            cursorImage.raycastTarget = false;
         }
 
         // Creates the two RawImage layers used for the idle ring and progress arc.
@@ -180,6 +227,57 @@ namespace MyLittleCaveheart
             image.color = Color.white;
             image.raycastTarget = false;
             return image;
+        }
+
+        // Applies the current cursor artwork through UI, including the default cursor shown at startup.
+        private void ApplyCursorImage(Texture2D texture)
+        {
+            if (cursorImage == null || cursorImageRect == null)
+            {
+                CaveheartCursorVisibilityGuard.SetOverrideActive(this, true);
+                return;
+            }
+
+            cursorImage.texture = texture;
+            cursorImageRect.sizeDelta = Vector2.one * cursorImageSize;
+            if (texture != null)
+            {
+                cursorImageRect.SetAsLastSibling();
+            }
+
+            UpdateCursorImageVisibility();
+        }
+
+        // Resolves the artwork for default, hover hand, and active grab states.
+        private Texture2D CursorTexture(ExamCursorMode mode)
+        {
+            switch (mode)
+            {
+                case ExamCursorMode.Hand:
+                    return handCursor = ResolveCursorTexture(handCursor, "cursor_touch_64");
+                case ExamCursorMode.Grab:
+                    return grabCursor = ResolveCursorTexture(grabCursor, "cursor_tickled_64");
+                default:
+                    return defaultCursor = ResolveCursorTexture(defaultCursor, "cursor_default_flint_64");
+            }
+        }
+
+        // Loads cursor art as a regular UI texture, avoiding Cursor.SetCursor texture restrictions.
+        private static Texture2D ResolveCursorTexture(Texture2D assignedTexture, string assetName)
+        {
+            if (assignedTexture != null)
+            {
+                return assignedTexture;
+            }
+
+            var texture = Resources.Load<Texture2D>(CursorResourceRoot + assetName);
+            if (texture != null)
+            {
+                return texture;
+            }
+
+            var sprite = Resources.Load<Sprite>(CursorResourceRoot + assetName);
+            return sprite == null ? null : sprite.texture;
         }
 
         // Allocates ring textures only when the required size changes.
@@ -280,62 +378,60 @@ namespace MyLittleCaveheart
             observeHoldRingRect.anchoredPosition = localPoint;
         }
 
-        // Resolves the texture assigned to each cursor mode.
-        private Texture2D CursorTexture(ExamCursorMode mode)
+        // Keeps the UI cursor within the overlay canvas while tracking the real pointer.
+        private void PositionCursorImage()
         {
-            switch (mode)
+            if (cursorImageRect == null
+                || cursorImage == null
+                || !cursorImage.enabled
+                || !cursorImageRect.gameObject.activeInHierarchy)
             {
-                case ExamCursorMode.Default:
-                    return defaultCursor = EnsureCursorTexture(defaultCursor, "cursor_default_flint_64");
-                case ExamCursorMode.Hand:
-                    return handCursor = EnsureCursorTexture(handCursor, "cursor_touch_64");
-                case ExamCursorMode.Grab:
-                    return grabCursor = EnsureCursorTexture(grabCursor, "cursor_tickled_64");
-                default:
-                    return null;
+                return;
             }
+
+            var canvasRect = cursorImageRect.parent as RectTransform;
+            if (canvasRect == null
+                || !RectTransformUtility.ScreenPointToLocalPointInRectangle(
+                    canvasRect,
+                    Input.mousePosition,
+                    null,
+                    out var localPoint))
+            {
+                return;
+            }
+
+            var halfSize = cursorImageRect.sizeDelta * 0.5f;
+            var canvasBounds = canvasRect.rect;
+            localPoint += cursorImageOffset;
+            localPoint.x = Mathf.Clamp(localPoint.x, canvasBounds.xMin + halfSize.x, canvasBounds.xMax - halfSize.x);
+            localPoint.y = Mathf.Clamp(localPoint.y, canvasBounds.yMin + halfSize.y, canvasBounds.yMax - halfSize.y);
+            cursorImageRect.anchoredPosition = localPoint;
+            cursorImageRect.SetAsLastSibling();
         }
 
-        // Returns a runtime-safe cursor texture whether the source came from the Inspector or Resources.
-        private static Texture2D EnsureCursorTexture(Texture2D currentTexture, string assetName)
+        // Shows the UI cursor only while the pointer is inside the game window.
+        private void UpdateCursorImageVisibility()
         {
-            var source = currentTexture != null ? currentTexture : LoadCursorTexture(assetName);
-            if (source == null || source.name.EndsWith(" Cursor Runtime"))
+            if (cursorImage == null)
             {
-                return source;
+                return;
             }
 
-            return CreateCursorCompatibleTexture(source, assetName);
+            var visible = cursorImage.texture != null && CaveheartCursorVisibilityGuard.ShouldShowUiCursor(this);
+            cursorImage.enabled = visible;
+            cursorImage.gameObject.SetActive(visible);
         }
 
-        // Loads raw cursor art through the same Resources path used by CaveheartGameController.
-        private static Texture2D LoadCursorTexture(string assetName)
+        // Hides the UI cursor locally without changing native cursor ownership.
+        private void HideCursorImage()
         {
-            var sprite = Resources.Load<Sprite>($"Sprites/Caveheart/CursorIcons/Size64/{assetName}");
-            if (sprite != null)
+            if (cursorImage == null)
             {
-                return sprite.texture;
+                return;
             }
 
-            return Resources.Load<Texture2D>($"Sprites/Caveheart/CursorIcons/Size64/{assetName}");
-        }
-
-        // Copies imported cursor art into RGBA32 without mipmaps so Unity accepts it in Cursor.SetCursor.
-        private static Texture2D CreateCursorCompatibleTexture(Texture2D source, string assetName)
-        {
-            if (source == null)
-            {
-                return null;
-            }
-
-            var cursor = new Texture2D(source.width, source.height, TextureFormat.RGBA32, false);
-            cursor.name = assetName + " Cursor Runtime";
-            cursor.wrapMode = TextureWrapMode.Clamp;
-            cursor.filterMode = FilterMode.Bilinear;
-            cursor.hideFlags = HideFlags.HideAndDontSave;
-            cursor.SetPixels32(source.GetPixels32());
-            cursor.Apply(false, false);
-            return cursor;
+            cursorImage.enabled = false;
+            cursorImage.gameObject.SetActive(false);
         }
     }
 }
