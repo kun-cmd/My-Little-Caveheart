@@ -472,6 +472,106 @@ namespace MyLittleCaveheart.Tests
         }
 
         [Test]
+        public void FireHoverLabelStaysRightOfPointerAndInsideScreen()
+        {
+            var nearRightEdge = FireLevelController.ClampHoverLabelScreenPosition(
+                new Vector2(790f, 300f),
+                new Vector2(800f, 600f),
+                new Vector2(180f, 36f),
+                new Vector2(18f, -18f));
+            var normal = FireLevelController.ClampHoverLabelScreenPosition(
+                new Vector2(240f, 300f),
+                new Vector2(800f, 600f),
+                new Vector2(180f, 36f),
+                new Vector2(18f, -18f));
+
+            Assert.AreEqual(612f, nearRightEdge.x);
+            Assert.AreEqual(282f, nearRightEdge.y);
+            Assert.AreEqual(258f, normal.x);
+            Assert.AreEqual(282f, normal.y);
+        }
+
+        [Test]
+        public void FireSceneArtPrefersNoFireBackgroundForDynamicFire()
+        {
+            Assert.AreEqual(
+                "CaveBackground_NoFire",
+                FireLevelController.SelectSceneArtBackgroundAssetName(true));
+            Assert.AreEqual(
+                "CaveBackground_WarmInterior",
+                FireLevelController.SelectSceneArtBackgroundAssetName(false));
+        }
+
+        [Test]
+        public void FireSceneArtChoosesDryAndWetLogSprites()
+        {
+            Assert.AreEqual("Firewood_Dry_Log", FireLevelController.SelectKindlingSceneArtAssetName(true));
+            Assert.AreEqual("Firewood_Wet_Log", FireLevelController.SelectKindlingSceneArtAssetName(false));
+        }
+
+        [Test]
+        public void FireKindlingHitSegmentAcceptsPointsAlongSlantedLog()
+        {
+            var start = new Vector2(-0.85f, -0.5f);
+            var end = new Vector2(0.85f, 0.5f);
+
+            Assert.IsTrue(FireLevelInteractable.IsPointInsideSegment(new Vector2(0.1f, 0.08f), start, end, 0.24f));
+        }
+
+        [Test]
+        public void FireKindlingHitSegmentRejectsTransparentSpriteCorners()
+        {
+            var start = new Vector2(-0.85f, -0.5f);
+            var end = new Vector2(0.85f, 0.5f);
+
+            Assert.IsFalse(FireLevelInteractable.IsPointInsideSegment(new Vector2(-0.8f, 0.75f), start, end, 0.24f));
+        }
+
+        [Test]
+        public void FireDragPlacementIgnoresDepthWhenBoundsOverlapInWorldXY()
+        {
+            var dragged = new Bounds(new Vector3(0f, -1.6f, -0.5f), new Vector3(0.8f, 0.8f, 0f));
+            var target = new Bounds(new Vector3(0f, -1.65f, -0.7f), new Vector3(2.2f, 1.45f, 0f));
+
+            Assert.IsTrue(FireLevelController.BoundsOverlapXY(dragged, target, 0f));
+            Assert.IsFalse(dragged.Intersects(target));
+        }
+
+        [Test]
+        public void WindVisualDirectionDoesNotJumpWhileOldWindFadesOut()
+        {
+            Assert.AreEqual(-1, FireLevelController.ResolveWindVisualDirection(-1, 1, 0.35f, false));
+            Assert.AreEqual(1, FireLevelController.ResolveWindVisualDirection(-1, 1, 0f, false));
+            Assert.AreEqual(1, FireLevelController.ResolveWindVisualDirection(-1, 1, 0.35f, true));
+        }
+
+        [Test]
+        public void FireRoastingContinuesAtSmallestFlame()
+        {
+            var drySeconds = FireLevelController.ResolveRoastDrySeconds(
+                0f,
+                55f,
+                28f,
+                8f,
+                8f,
+                12f,
+                14f,
+                26f);
+
+            Assert.AreEqual(26f, drySeconds);
+            Assert.Greater(1f / drySeconds, 0f);
+        }
+
+        [Test]
+        public void FireRoastingUsesExpectedHeatBands()
+        {
+            Assert.AreEqual(26f, FireLevelController.ResolveRoastDrySeconds(7.9f, 55f, 28f, 8f, 8f, 12f, 14f, 26f));
+            Assert.AreEqual(14f, FireLevelController.ResolveRoastDrySeconds(8f, 55f, 28f, 8f, 8f, 12f, 14f, 26f));
+            Assert.AreEqual(12f, FireLevelController.ResolveRoastDrySeconds(28f, 55f, 28f, 8f, 8f, 12f, 14f, 26f));
+            Assert.AreEqual(8f, FireLevelController.ResolveRoastDrySeconds(55f, 55f, 28f, 8f, 8f, 12f, 14f, 26f));
+        }
+
+        [Test]
         public void TimeWindowClosesWithoutFailureLanguage()
         {
             var gameObject = new GameObject("Caveheart test controller");

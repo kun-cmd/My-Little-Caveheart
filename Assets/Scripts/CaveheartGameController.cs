@@ -7,6 +7,7 @@ namespace MyLittleCaveheart
 {
     public sealed class CaveheartGameController : MonoBehaviour
     {
+        private const string CursorResourceRoot = "Sprites/Caveheart/CursorIcons/Size64/";
         private const string OpeningGoalText = "Help him sit up gently. Watch if he is awake, safe, and calm.";
 
         private enum MorningOutcome
@@ -38,12 +39,15 @@ namespace MyLittleCaveheart
         [SerializeField] private bool resetCurtainOnMorning = true;
 
         [Header("Cursor Images")]
+        [SerializeField] private Texture2D defaultCursor;
         [SerializeField] private Texture2D urgeCursor;
         [SerializeField] private Texture2D touchCursor;
         [SerializeField] private Texture2D waterCursor;
         [SerializeField] private Texture2D windowCursor;
         [SerializeField] private Texture2D scratchCursor;
         [SerializeField] private Texture2D observeCursor;
+        [SerializeField, Min(8f)] private float cursorImageSize = 37f;
+        [SerializeField] private Vector2 cursorImageOffset = Vector2.zero;
 
         [Header("Music")]
         [SerializeField] private AudioClip backgroundMusicClip;
@@ -102,6 +106,8 @@ namespace MyLittleCaveheart
         private Button hudRestartButton;
         private Text hudHoverText;
         private RectTransform hudHoverRect;
+        private RectTransform cursorImageRect;
+        private RawImage cursorImage;
         private RectTransform observeHoldRingRect;
         private RawImage observeHoldIdleRingImage;
         private RawImage observeHoldProgressRingImage;
@@ -144,6 +150,12 @@ namespace MyLittleCaveheart
         public CaveheartInteractionType? CurrentHoveredInteraction => hoveredInteraction;
         public Vector3 HoveredInteractionWorldPosition => hoveredInteractionWorldPosition;
 
+        // Reclaims the native cursor when this controller is re-enabled during play.
+        private void OnEnable()
+        {
+            CaveheartCursorVisibilityGuard.SetOverrideActive(this, true);
+        }
+
         private void Start()
         {
             BeginMorning();
@@ -161,6 +173,7 @@ namespace MyLittleCaveheart
             EnsureEnvironmentFeedback();
             CaveheartBackgroundMusic.Ensure(backgroundMusicClip, backgroundMusicVolume);
             EnsureWhiteboxHud();
+            CaveheartCursorVisibilityGuard.SetOverrideActive(this, true);
             ApplyInteractionCursor(null, false);
             PublishState();
             UpdateWhiteboxHudValues();
@@ -182,6 +195,12 @@ namespace MyLittleCaveheart
             UpdateWorldInteractionInput();
             UpdateHoverTooltip();
             UpdateWhiteboxHudValues();
+        }
+
+        private void LateUpdate()
+        {
+            UpdateCursorImageVisibility();
+            PositionCursorImage();
         }
 
         public bool IsInteractionAvailable(CaveheartInteractionType interactionType)
@@ -793,6 +812,7 @@ namespace MyLittleCaveheart
             RemoveObsoleteUiElement(uiRoot.transform, "Observe Button");
             RemoveObsoleteUiElement(uiRoot.transform, "Observe Hold Ring");
 
+            EnsureCursorImage(EnsureCursorUiRoot());
             hudValuesText = FindOrCreateHudText(uiRoot.transform, "Whitebox Values Text", debugValuesPosition, debugValuesSize, TextAnchor.UpperRight, 20);
             FindOrCreateSignalBars(uiRoot.transform);
             hudReactionText = FindOrCreateHudText(uiRoot.transform, "Reaction Text", reactionTextPosition, reactionTextSize, TextAnchor.UpperCenter, 20);
@@ -802,6 +822,69 @@ namespace MyLittleCaveheart
             FindOrCreateOutcomeUi(uiRoot.transform);
             RemoveActionButtons(uiRoot.transform);
             hudReactionText.text = OpeningGoalText;
+        }
+
+        // Creates a pixel-exact cursor canvas so cursor icons are not scaled by the HUD canvas.
+        private static Transform EnsureCursorUiRoot()
+        {
+            var uiRoot = GameObject.Find("Caveheart Cursor UI");
+            if (uiRoot == null)
+            {
+                uiRoot = new GameObject("Caveheart Cursor UI");
+            }
+
+            var canvas = uiRoot.GetComponent<Canvas>();
+            if (canvas == null)
+            {
+                canvas = uiRoot.AddComponent<Canvas>();
+            }
+
+            canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+            canvas.sortingOrder = 5000;
+
+            var scaler = uiRoot.GetComponent<CanvasScaler>();
+            if (scaler == null)
+            {
+                scaler = uiRoot.AddComponent<CanvasScaler>();
+            }
+
+            scaler.uiScaleMode = CanvasScaler.ScaleMode.ConstantPixelSize;
+            scaler.scaleFactor = 1f;
+
+            if (uiRoot.GetComponent<GraphicRaycaster>() == null)
+            {
+                uiRoot.AddComponent<GraphicRaycaster>();
+            }
+
+            return uiRoot.transform;
+        }
+
+        private void EnsureCursorImage(Transform parent)
+        {
+            var cursorTransform = parent.Find("Caveheart Cursor Image");
+            var cursorObject = cursorTransform == null ? new GameObject("Caveheart Cursor Image") : cursorTransform.gameObject;
+            cursorObject.transform.SetParent(parent, false);
+            cursorObject.transform.SetAsLastSibling();
+
+            cursorImageRect = cursorObject.GetComponent<RectTransform>();
+            if (cursorImageRect == null)
+            {
+                cursorImageRect = cursorObject.AddComponent<RectTransform>();
+            }
+
+            cursorImageRect.anchorMin = new Vector2(0.5f, 0.5f);
+            cursorImageRect.anchorMax = new Vector2(0.5f, 0.5f);
+            cursorImageRect.pivot = new Vector2(0.5f, 0.5f);
+            cursorImageRect.sizeDelta = Vector2.one * cursorImageSize;
+
+            cursorImage = cursorObject.GetComponent<RawImage>();
+            if (cursorImage == null)
+            {
+                cursorImage = cursorObject.AddComponent<RawImage>();
+            }
+
+            cursorImage.color = Color.white;
+            cursorImage.raycastTarget = false;
         }
 
         private void EnsureObserveHoldIndicator(Transform parent)
@@ -882,6 +965,7 @@ namespace MyLittleCaveheart
             }
 
             observeHoldRingRect.gameObject.SetActive(visible);
+            cursorImageRect?.SetAsLastSibling();
         }
 
         private void EnsureObserveHoldTextures(int size)
@@ -1087,15 +1171,15 @@ namespace MyLittleCaveheart
 
         private void ApplyInteractionCursor(CaveheartInteractionType? interaction, bool available)
         {
-            Cursor.visible = true;
-
             var texture = interaction.HasValue && available
                 ? CursorTexture(interaction.Value)
-                : null;
-            var hotspot = texture == null
-                ? Vector2.zero
-                : new Vector2(texture.width * 0.5f, texture.height * 0.5f);
-            Cursor.SetCursor(texture, hotspot, CursorMode.ForceSoftware);
+                : DefaultCursorTexture();
+            ApplyCursorImage(texture);
+        }
+
+        private Texture2D DefaultCursorTexture()
+        {
+            return defaultCursor = ResolveCursorTexture(defaultCursor, "cursor_default_flint_64");
         }
 
         private Texture2D CursorTexture(CaveheartInteractionType interaction)
@@ -1103,72 +1187,114 @@ namespace MyLittleCaveheart
             switch (interaction)
             {
                 case CaveheartInteractionType.Alarm:
-                    return urgeCursor = EnsureCursorTexture(urgeCursor, "cursor_rooster_crow_64");
+                    return urgeCursor = ResolveCursorTexture(urgeCursor, "cursor_rooster_crow_64");
                 case CaveheartInteractionType.GentleTouch:
-                    return touchCursor = EnsureCursorTexture(touchCursor, "cursor_touch_64");
+                    return touchCursor = ResolveCursorTexture(touchCursor, "cursor_touch_64");
                 case CaveheartInteractionType.OfferWater:
-                    return waterCursor = EnsureCursorTexture(waterCursor, "cursor_wooden_cup_64");
+                    return waterCursor = ResolveCursorTexture(waterCursor, "cursor_wooden_cup_64");
                 case CaveheartInteractionType.OpenCurtain:
-                    return windowCursor = EnsureCursorTexture(windowCursor, "cursor_curtain_open_64");
+                    return windowCursor = ResolveCursorTexture(windowCursor, "cursor_curtain_open_64");
                 case CaveheartInteractionType.Scratch:
-                    return scratchCursor = EnsureCursorTexture(scratchCursor, "cursor_tickled_64");
+                    return scratchCursor = ResolveCursorTexture(scratchCursor, "cursor_tickled_64");
                 case CaveheartInteractionType.Wait:
-                    return observeCursor = EnsureCursorTexture(observeCursor, "cursor_observe_eye_64");
+                    return observeCursor = ResolveCursorTexture(observeCursor, "cursor_observe_eye_64");
                 default:
-                    return null;
+                    return DefaultCursorTexture();
             }
         }
 
-        // Returns a runtime-safe cursor texture whether the source came from the Inspector or Resources.
-        private static Texture2D EnsureCursorTexture(Texture2D currentTexture, string assetName)
+        private void ApplyCursorImage(Texture2D texture)
         {
-            var source = currentTexture != null ? currentTexture : LoadCursorTexture(assetName);
-            if (source == null || source.name.EndsWith(" Cursor Runtime"))
+            if (cursorImage == null || cursorImageRect == null)
             {
-                return source;
+                CaveheartCursorVisibilityGuard.SetOverrideActive(this, true);
+                return;
             }
 
-            return CreateCursorCompatibleTexture(source, assetName);
-        }
-
-        private static Texture2D LoadCursorTexture(string assetName)
-        {
-            var sprite = LoadCursorSprite(assetName);
-            if (sprite != null)
+            cursorImage.texture = texture;
+            cursorImageRect.sizeDelta = Vector2.one * cursorImageSize;
+            if (texture != null)
             {
-                return sprite.texture;
+                cursorImageRect.SetAsLastSibling();
             }
 
-            return Resources.Load<Texture2D>($"Sprites/Caveheart/CursorIcons/Size64/{assetName}");
+            UpdateCursorImageVisibility();
         }
 
-        // Copies imported cursor art into RGBA32 without mipmaps so Unity accepts it in Cursor.SetCursor.
-        private static Texture2D CreateCursorCompatibleTexture(Texture2D source, string assetName)
+        private static Texture2D ResolveCursorTexture(Texture2D assignedTexture, string assetName)
         {
-            if (source == null)
+            if (assignedTexture != null)
             {
-                return null;
+                return assignedTexture;
             }
 
-            var cursor = new Texture2D(source.width, source.height, TextureFormat.RGBA32, false);
-            cursor.name = assetName + " Cursor Runtime";
-            cursor.wrapMode = TextureWrapMode.Clamp;
-            cursor.filterMode = FilterMode.Bilinear;
-            cursor.hideFlags = HideFlags.HideAndDontSave;
-            cursor.SetPixels32(source.GetPixels32());
-            cursor.Apply(false, false);
-            return cursor;
+            var texture = Resources.Load<Texture2D>(CursorResourceRoot + assetName);
+            if (texture != null)
+            {
+                return texture;
+            }
+
+            var sprite = Resources.Load<Sprite>(CursorResourceRoot + assetName);
+            return sprite == null ? null : sprite.texture;
         }
 
-        private static Sprite LoadCursorSprite(string assetName)
+        private void PositionCursorImage()
         {
-            return Resources.Load<Sprite>($"Sprites/Caveheart/CursorIcons/Size64/{assetName}");
+            if (cursorImageRect == null
+                || cursorImage == null
+                || !cursorImage.enabled
+                || !cursorImageRect.gameObject.activeInHierarchy)
+            {
+                return;
+            }
+
+            var canvasRect = cursorImageRect.parent as RectTransform;
+            if (canvasRect == null
+                || !RectTransformUtility.ScreenPointToLocalPointInRectangle(
+                    canvasRect,
+                    Input.mousePosition,
+                    null,
+                    out var localPoint))
+            {
+                return;
+            }
+
+            var halfSize = cursorImageRect.sizeDelta * 0.5f;
+            var canvasBounds = canvasRect.rect;
+            localPoint += cursorImageOffset;
+            localPoint.x = Mathf.Clamp(localPoint.x, canvasBounds.xMin + halfSize.x, canvasBounds.xMax - halfSize.x);
+            localPoint.y = Mathf.Clamp(localPoint.y, canvasBounds.yMin + halfSize.y, canvasBounds.yMax - halfSize.y);
+            cursorImageRect.anchoredPosition = localPoint;
+            cursorImageRect.SetAsLastSibling();
+        }
+
+        private void UpdateCursorImageVisibility()
+        {
+            if (cursorImage == null)
+            {
+                return;
+            }
+
+            var visible = cursorImage.texture != null && CaveheartCursorVisibilityGuard.ShouldShowUiCursor(this);
+            cursorImage.enabled = visible;
+            cursorImage.gameObject.SetActive(visible);
         }
 
         private void OnDisable()
         {
-            Cursor.visible = true;
-            Cursor.SetCursor(null, Vector2.zero, CursorMode.Auto);
+            HideCursorImage();
+            CaveheartCursorVisibilityGuard.SetOverrideActive(this, false);
+        }
+
+        private void HideCursorImage()
+        {
+            if (cursorImage == null)
+            {
+                return;
+            }
+
+            cursorImage.enabled = false;
+            cursorImage.gameObject.SetActive(false);
         }
 
         private static void RemoveObsoleteUiElement(Transform parent, string objectName)
